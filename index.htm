@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101116">
+<title>The Orthodox Muslim | Clip Maker</title>
+<style>
+:root{color-scheme:dark;--bg:#101116;--panel:#191b23;--panel2:#222530;--line:#303442;--text:#f1f2f6;--muted:#a2a8b7;--accent:#8b79ff;--accent2:#b7adff;--good:#42c98b;--bad:#ff7474;--radius:16px}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+header{padding:18px 20px;border-bottom:1px solid var(--line);background:#14151b}
+.head{max-width:900px;margin:auto;display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;font-size:19px}
+h1{font-size:18px;line-height:1.2;margin:0;font-weight:750;letter-spacing:-.02em}
+.subhead{font-size:12px;color:var(--muted);margin-top:3px}
+main{width:min(900px,100%);margin:26px auto;padding:0 16px 70px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.section-title{margin:0 0 8px;font-size:16px;font-weight:700}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+#drop{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:150px;padding:22px;border:2px dashed #45495a;border-radius:13px;background:#151720;cursor:pointer;transition:border-color .15s,background .15s}
+#drop:hover,#drop.over{border-color:var(--accent);background:#1b1b2a}
+#drop-icon{font-size:27px;margin-bottom:7px}
+#file-name{font-weight:650;overflow-wrap:anywhere}
+#file-meta{font-size:12px;color:var(--muted);margin-top:4px}
+textarea{display:block;width:100%;min-height:205px;resize:vertical;background:#12141b;border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:14px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none}
+textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px #8b79ff22}
+.example{margin-top:10px;padding:10px 12px;background:#14161e;border-radius:10px;color:var(--muted);font:12px/1.7 ui-monospace,monospace;white-space:pre-wrap}
+#go{width:100%;margin-top:18px;border:0;border-radius:12px;padding:14px 18px;background:linear-gradient(100deg,#7965ed,#927dff);font-weight:750;font-size:15px;cursor:pointer}
+#go:disabled{opacity:.55;cursor:wait}
+#privacy{margin-top:10px;text-align:center;color:var(--muted);font-size:12px}
+#status{margin-top:20px;color:var(--muted);font-size:13px}
+#results{margin-top:22px}
+.results-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.results-head h2{margin:0;font-size:18px}
+#result-count{color:var(--muted);font-size:12px}
+.clip{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
+.clip-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.clip-title{font-weight:700;font-size:15px;overflow-wrap:anywhere}
+.clip-time{color:var(--muted);font:12px ui-monospace,monospace;white-space:nowrap;padding-top:3px}
+.clip video{display:block;width:100%;max-height:390px;aspect-ratio:16/9;object-fit:contain;background:#08090c;border-radius:10px;margin-top:12px}
+.caption-label{font-size:11px;font-weight:750;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:14px}
+.caption{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin-top:6px;padding:11px 12px;background:#12141b;border:1px solid var(--line);border-radius:10px}
+.tags{color:var(--accent2);margin-top:8px;font-size:13px;overflow-wrap:anywhere}
+.clip-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border:1px solid var(--line);border-radius:9px;padding:8px 12px;background:var(--panel2);cursor:pointer;font-size:13px;font-weight:650}
+.btn.primary{background:#7764e8;border-color:#7764e8;color:white}
+.btn:hover{border-color:var(--accent)}
+#busy{position:fixed;inset:0;z-index:30;background:#090a0ecf;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center}
+.busy-box{width:min(360px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+.spinner{width:38px;height:38px;border:4px solid #383b4a;border-top-color:var(--accent);border-radius:50%;margin:0 auto 14px;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#busy-text{font-weight:650}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:40;max-width:calc(100vw - 30px);padding:10px 15px;background:#292c38;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px #0008;font-size:13px}
+#toast.error{border-color:var(--bad);color:#ffd0d0}
+@media(max-width:600px){header{padding:14px 15px}main{margin:16px auto;padding:0 11px 50px}.panel{padding:14px}#drop{min-height:135px}.clip-head{display:block}.clip-time{margin-top:3px}.clip video{max-height:250px}}
+</style>
+</head>
+<body>
+<header><div class="head"><div class="logo">✂</div><div><h1>The Orthodox Muslim · Clip Maker</h1><div class="subhead">Turn your timestamp notes into ready-to-post clips</div></div></div></header>
+<main>
+<section class="panel">
+  <h2 class="section-title">1. Upload your video</h2>
+  <label id="drop" for="file">
+    <input id="file" type="file" accept="video/*" hidden>
+    <span id="drop-icon">＋</span>
+    <span id="file-name">Choose a video or drop it here</span>
+    <span id="file-meta">MP4, MOV, WebM and other browser-supported video files</span>
+  </label>
+  <h2 class="section-title" style="margin-top:22px">2. Paste your timestamp notes</h2>
+  <p class="hint" style="margin-bottom:10px">Add one time range for each clip, followed by why that moment matters. The AI uses your notes to write the caption and choose relevant hashtags.</p>
+  <textarea id="notes" spellcheck="false" placeholder="00:12 - 00:48 | A powerful explanation of the main point. This is the moment I want clipped.&#10;01:04 - 01:39 | A sharp response that makes the argument clear.&#10;02:10 - 02:52 | A quiz moment with a surprising answer."></textarea>
+  <div class="example">Use one range per clip: 00:12 - 00:48 | Why this moment is iconic
+For videos over an hour: 1:02:10 - 1:02:46 | Your note</div>
+  <button id="go" type="button">Create clips & captions</button>
+  <p id="privacy">AI reads your pasted notes. Your video stays in your browser and is cut on your device.</p>
+</section>
+<div id="status" role="status" aria-live="polite"></div>
+<section id="results" hidden>
+  <div class="results-head"><h2>Your clips</h2><span id="result-count"></span></div>
+  <div id="clip-list"></div>
+</section>
+</main>
+<div id="busy" hidden><div class="busy-box"><div class="spinner"></div><div id="busy-text">Working...</div></div></div>
+<div id="toast" hidden></div>
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const state = { file: null, fileUrl: null, duration: 0, busy: false, ffmpeg: null, inputName: null, outputs: [] };
+const CORE_BASE = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm";
+const TIME = "\\d{1,2}:\\d{2}(?::\\d{2})?";
+const RANGE_RE = new RegExp(`(${TIME})\\s*(?:-|–|—|to)\\s*(${TIME})`, "gi");
+
+function formatTime(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`;
+}
+function parseTime(value) {
+  const parts = String(value).trim().split(":").map(Number);
+  if (parts.some(n => !Number.isInteger(n) || n < 0)) return NaN;
+  if (parts.length === 2 && parts[1] < 60) return parts[0] * 60 + parts[1];
+  if (parts.length === 3 && parts[1] < 60 && parts[2] < 60) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return NaN;
+}
+function parseNotes(text) {
+  const matches = [...text.matchAll(RANGE_RE)];
+  if (!matches.length) throw new Error("Add at least one timestamp range, such as 00:12 - 00:48 | your note.");
+  if (matches.length > 30) throw new Error("Please keep each batch to 30 clips or fewer.");
+  return matches.map((match, index) => {
+    const start = parseTime(match[1]), end = parseTime(match[2]);
+    const noteStart = match.index + match[0].length;
+    const noteEnd = index + 1 < matches.length ? matches[index + 1].index : text.length;
+    const note = text.slice(noteStart, noteEnd).replace(/^[\s|:;,.[\]{}()\-–—]+/, "").trim();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error(`Check the timestamp range for clip ${index + 1}.`);
+    if (!note) throw new Error(`Add a short note explaining clip ${index + 1}.`);
+    return { start, end, note };
+  });
+}
+function showBusy(on, message = "Working...") {
+  state.busy = on;
+  $("#busy").hidden = !on;
+  $("#busy-text").textContent = message;
+  $("#go").disabled = on;
+}
+let toastTimer;
+function toast(message, error = false) {
+  const el = $("#toast");
+  el.textContent = message;
+  el.className = error ? "error" : "";
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.hidden = true, error ? 6500 : 2800);
+}
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
+}
+function slug(text) {
+  return String(text || "clip").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,55) || "clip";
+}
+async function copyCaption(item) {
+  const text = `${item.caption}\n\n${item.tags.map(tag => `#${tag.replace(/^#/,'')}`).join(" ")}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Caption and hashtags copied.");
+  } catch {
+    const box = document.createElement("textarea");
+    box.value = text; document.body.append(box); box.select();
+    const ok = document.execCommand("copy"); box.remove();
+    toast(ok ? "Caption and hashtags copied." : "Clipboard access was blocked.", !ok);
+  }
+}
+async function callAI(clips) {
+  let response;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    response = await fetch("/api/highlights", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-app-password": localStorage.getItem("clipper.password") || "" },
+      body: JSON.stringify({ mode: "notes", clips, durationSeconds: state.duration })
+    });
+    if (response.status === 401 && attempt === 0) {
+      const password = prompt("Enter the app password:");
+      if (!password) throw new Error("Password required.");
+      localStorage.setItem("clipper.password", password);
+      continue;
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) localStorage.removeItem("clipper.password");
+      throw new Error(data.error || `AI request failed (HTTP ${response.status}).`);
+    }
+    return data;
+  }
+  throw new Error("Unable to reach the AI service.");
+}
+async function getFFmpeg() {
+  if (state.ffmpeg) return state.ffmpeg;
+  let FFmpeg, toBlobURL;
+  try {
+    ({ FFmpeg } = await import("/vendor/ffmpeg/index.js"));
+    ({ toBlobURL } = await import("/vendor/util/index.js"));
+  } catch {
+    throw new Error("The video engine is missing. Deploy the full project after running its build step.");
+  }
+  const ff = new FFmpeg();
+  ff.on("log", ({ message }) => window.CLIPPER_DEBUG && console.log(message));
+  ff.on("progress", ({ progress }) => {
+    if (state.busy && state.progressMessage) $("#busy-text").textContent = `${state.progressMessage} ${Math.round(progress * 100)}%`;
+  });
+  await ff.load({
+    coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, "application/wasm")
+  });
+  state.ffmpeg = ff;
+  return ff;
+}
+async function prepareInput(ff) {
+  if (state.inputName) { try { await ff.deleteFile(state.inputName); } catch {} }
+  const ext = state.file.name.match(/\.[a-z0-9]{1,5}$/i)?.[0] || ".mp4";
+  state.inputName = `source${ext.toLowerCase()}`;
+  await ff.writeFile(state.inputName, new Uint8Array(await state.file.arrayBuffer()));
+  return state.inputName;
+}
+function renderOutputs() {
+  const list = $("#clip-list");
+  list.innerHTML = state.outputs.map((item, i) => `
+    <article class="clip">
+      <div class="clip-head"><div class="clip-title">${escapeHTML(item.title || `Clip ${i + 1}`)}</div><div class="clip-time">${formatTime(item.start)}–${formatTime(item.end)}</div></div>
+      <video controls playsinline preload="metadata" src="${item.url}"></video>
+      <div class="caption-label">Caption</div>
+      <div class="caption">${escapeHTML(item.caption)}</div>
+      <div class="tags">${item.tags.map(tag => `#${escapeHTML(tag)}`).join("　")}</div>
+      <div class="clip-actions">
+        <button class="btn primary" data-copy="${i}" type="button">Copy caption + hashtags</button>
+        <a class="btn" href="${item.url}" download="${escapeHTML(item.name)}">Download MP4</a>
+      </div>
+    </article>`).join("");
+  $("#results").hidden = !state.outputs.length;
+  $("#result-count").textContent = `${state.outputs.length} ready`;
+}
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+async function makeClips(highlights) {
+  const ff = await getFFmpeg();
+  const input = await prepareInput(ff);
+  state.outputs.forEach(item => URL.revokeObjectURL(item.url));
+  state.outputs = [];
+  $("#clip-list").innerHTML = "";
+  for (let i = 0; i < highlights.length; i++) {
+    const h = highlights[i];
+    state.progressMessage = `Cutting clip ${i + 1} of ${highlights.length}...`;
+    showBusy(true, state.progressMessage);
+    const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
+    const duration = h.end - h.start;
+    const args = [
+      "-ss", h.start.toFixed(3), "-i", input, "-t", duration.toFixed(3),
+      "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output
+    ];
+    const code = await ff.exec(args);
+    if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
+    const bytes = await ff.readFile(output);
+    try { await ff.deleteFile(output); } catch {}
+    const title = h.title || `Clip ${i + 1}`;
+    const name = `${String(i + 1).padStart(2,"0")}-${slug(title)}.mp4`;
+    state.outputs.push({ ...h, name, url: URL.createObjectURL(new Blob([bytes], { type: "video/mp4" })) });
+    renderOutputs();
+  }
+  state.progressMessage = "";
+}
+async function run() {
+  if (state.busy) return;
+  try {
+    if (!state.file) throw new Error("Upload a video first.");
+    if (!state.duration) throw new Error("The video is still loading. Select it again in a moment.");
+    const clips = parseNotes($("#notes").value);
+    const invalid = clips.find((clip, i) => clip.end > state.duration + 0.5);
+    if (invalid) throw new Error(`Clip ${formatTime(invalid.start)}–${formatTime(invalid.end)} ends after the uploaded video.`);
+    showBusy(true, "AI is reading your notes and writing captions...");
+    const result = await callAI(clips);
+    if (!result.highlights?.length) throw new Error("The AI did not return any clips. Check the timestamp notes and try again.");
+    $("#status").textContent = `${result.highlights.length} timestamp ranges processed. Cutting your clips now...`;
+    await makeClips(result.highlights);
+    $("#status").textContent = `Finished. ${state.outputs.length} clips are ready to download.`;
+    $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
+    toast("Your clips are ready.");
+  } catch (error) {
+    console.error(error);
+    toast(error.message || String(error), true);
+    $("#status").textContent = "Something needs attention. Check the message above.";
+  } finally {
+    state.progressMessage = "";
+    showBusy(false);
+  }
+}
+function selectFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith("video/") && !/\.(mp4|mov|m4v|webm|mkv|avi|mpeg|mpg|3gp)$/i.test(file.name)) return toast("Choose a video file.", true);
+  if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
+  state.outputs.forEach(item => URL.revokeObjectURL(item.url));
+  state.outputs = [];
+  $("#results").hidden = true;
+  $("#status").textContent = "";
+  state.file = file;
+  state.duration = 0;
+  state.fileUrl = URL.createObjectURL(file);
+  $("#file-name").textContent = file.name;
+  $("#file-meta").textContent = `${(file.size / 1048576).toFixed(1)} MB · Reading duration...`;
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.onloadedmetadata = () => {
+    state.duration = Number.isFinite(video.duration) ? video.duration : 0;
+    $("#file-meta").textContent = `${(file.size / 1048576).toFixed(1)} MB · ${formatTime(state.duration)} long`;
+  };
+  video.onerror = () => { $("#file-meta").textContent = "Could not read this video. Try MP4 (H.264)."; };
+  video.src = state.fileUrl;
+}
+
+$("#go").addEventListener("click", run);
+$("#file").addEventListener("change", e => selectFile(e.target.files?.[0]));
+const drop = $("#drop");
+["dragenter","dragover"].forEach(type => drop.addEventListener(type, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(type => drop.addEventListener(type, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => selectFile(e.dataTransfer.files?.[0]));
+$("#clip-list").addEventListener("click", e => {
+  const button = e.target.closest("button[data-copy]");
+  if (button) copyCaption(state.outputs[Number(button.dataset.copy)]);
+});
+window.addEventListener("beforeunload", () => {
+  if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
+  state.outputs.forEach(item => URL.revokeObjectURL(item.url));
+});
+</script>
+</body>
+</html>
