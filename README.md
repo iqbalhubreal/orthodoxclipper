@@ -36,9 +36,8 @@ Use `H:MM:SS` for videos over an hour. Times inside a note are ignored as long a
 ## Options and features
 
 - **2-second padding**: every clip is cut 2 seconds before and after your timestamps (limited to the start and end of the video).
-- **Fast mode (default)**: no re-encoding, near-instant.
-- **Exact mode**: re-encodes and cuts precisely, but is very slow in a browser.
-- **Fast mode**: no re-encoding, much faster and lighter on memory. Clips may start a little early (nearest keyframe). Default on phones.
+- **Fast mode (default)**: no re-encoding, so clips are ready in seconds and use little memory. Clips may start a little early (nearest keyframe).
+- **Accurate mode**: re-encodes and cuts at the exact frame. It runs in single-threaded WebAssembly, so expect several times the clip length (slower still on phones). Use it only when Fast starts a clip too early.
 - **Make vertical (optional, after cutting)**: for two people side by side. Click Make vertical on a clip, drag one box onto each face (top person and bottom person), and it is made into a stacked 9:16 video for Shorts/Reels/TikTok. Use Apply to all clips to reuse the same boxes for every clip, or Make all vertical at the top of the results. Vertical versions are included in the zip.
 - Captions and hashtags are editable, can be rewritten per clip, and everything downloads as one `.zip` (with `captions.txt`).
 - Cancel button, screen stays awake while working, and the video is mounted rather than copied into memory.

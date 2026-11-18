@@ -1,6 +1,6 @@
 {
   "name": "clipper",
-  "version": "1.6.2",
+  "version": "1.6.1",
   "private": true,
   "type": "module",
   "description": "Local video clipping with AI-generated captions from timestamp notes",
