@@ -36,7 +36,7 @@ export async function onRequestPost({ request, env }) {
     contents: [{ role: "user", parts: [{ text: buildPrompt(clips.value, duration) }] }],
     generationConfig: {
       responseMimeType: "application/json",
-      thinkingConfig: { thinkingLevel: "MEDIUM" },
+      thinkingConfig: { thinkingLevel: "LOW" },
     },
   };
 

@@ -132,6 +132,7 @@ a{color:var(--accent2)}
     <span id="file-meta">MP4, MOV, WebM and other browser-supported video files</span>
   </label>
   <div id="warn" class="warn" role="note" hidden></div>
+  <div id="engine" class="hint" hidden></div>
 
   <h2 class="section-title sep"><span class="num" id="n3">3</span>Paste Gemini's answer</h2>
   <p class="hint" style="margin-bottom:10px">One clip per line: a time range, then the reason. Bold text, bullets and numbering from Gemini are fine. Your notes are saved in this browser.</p>
@@ -142,7 +143,7 @@ a{color:var(--accent2)}
     <summary>Cutting options</summary>
     <div class="opts">
       <label>Cutting mode
-        <select id="mode"><option value="accurate">Accurate (re-encode, slower)</option><option value="fast">Fast (no re-encode, lighter)</option></select>
+        <select id="mode"><option value="fast">Fast (recommended, near-instant)</option><option value="accurate">Exact (re-encodes, very slow)</option></select>
       </label>
     </div>
     <p class="hint" id="mode-hint"></p>
@@ -157,7 +158,7 @@ a{color:var(--accent2)}
   <div id="clip-list"></div>
 </section>
 </main>
-<div id="busy" role="alertdialog" aria-modal="true" aria-labelledby="busy-text" hidden><div class="busy-box"><div class="spinner"></div><div id="busy-text">Working...</div><div class="bar" id="bar" hidden><div id="bar-fill"></div></div><button id="cancel" class="btn" type="button">Cancel</button></div></div>
+<div id="busy" role="alertdialog" aria-modal="true" aria-labelledby="busy-text" hidden><div class="busy-box"><div class="spinner"></div><div id="busy-text">Working...</div><div id="busy-sub" class="hint"></div><div class="bar" id="bar" hidden><div id="bar-fill"></div></div><button id="cancel" class="btn" type="button">Cancel</button></div></div>
 <div id="editor" role="dialog" aria-modal="true" aria-labelledby="ed-title" hidden><div class="ed-box">
   <h3 id="ed-title">Frame clip</h3>
   <p class="hint">Drag each box onto a face. The top box becomes the top half of the vertical video and the bottom box the bottom half. Drag the round corner dot to resize, and use the slider to check other moments. The small preview shows the result. "Apply to all clips" uses these boxes for every clip.</p>
@@ -168,7 +169,7 @@ a{color:var(--accent2)}
 <div id="toast" role="status" aria-live="polite" hidden></div>
 <script type="module">
 const $ = (s) => document.querySelector(s);
-const state = { vw: 0, vh: 0, lastFrame: null, edVideo: null, file: null, fileUrl: null, duration: 0, busy: false, ffmpeg: null, input: null, outputs: [], progressMessage: "", cancelled: false, abort: null, cancelPromise: null, rejectCancel: null };
+const state = { vw: 0, vh: 0, lastFrame: null, enginePromise: null, engineText: "", edVideo: null, file: null, fileUrl: null, duration: 0, busy: false, ffmpeg: null, input: null, outputs: [], progressMessage: "", cancelled: false, abort: null, cancelPromise: null, rejectCancel: null };
 const CORE_BASES = [
   "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm",
   "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
@@ -284,12 +285,18 @@ function renderDetected() {
   }).join("");
   box.innerHTML = `<div class="det-head ${ok ? "good" : "bad"}">${clips.length} clip${clips.length > 1 ? "s" : ""} recognized${overlap ? " · " + escapeHTML(overlap) : ""}</div><ul>${rows}</ul>`;
 }
+let busyTimer = null, busyStart = 0;
 function showBusy(on, message = "Working...") {
   state.busy = on;
   $("#busy").hidden = !on;
   $("#busy-text").textContent = message;
   $("#go").disabled = on;
   $("#bar").hidden = !(on && state.clipTotal);
+  if (on && !busyTimer) {
+    busyStart = Date.now();
+    const tick = () => { $("#busy-sub").textContent = `${Math.round((Date.now() - busyStart) / 1000)}s` + (state.engineText && state.engineText !== "ready" ? ` · video engine: ${state.engineText}` : ""); };
+    tick(); busyTimer = setInterval(tick, 1000);
+  } else if (!on && busyTimer) { clearInterval(busyTimer); busyTimer = null; $("#busy-sub").textContent = ""; }
 }
 function setBar(f) { $("#bar-fill").style.width = `${Math.round(Math.min(1, Math.max(0, f)) * 100)}%`; }
 let toastTimer;
@@ -405,15 +412,41 @@ async function callAI(clips, signal) {
   throw new Error("Unable to reach the AI service.");
 }
 
-async function getFFmpeg() {
-  if (state.ffmpeg) return state.ffmpeg;
-  let FFmpeg, toBlobURL;
-  try {
-    ({ FFmpeg } = await import("/vendor/ffmpeg/index.js"));
-    ({ toBlobURL } = await import("/vendor/util/index.js"));
-  } catch {
-    throw new Error("The video engine is missing. Deploy the full project after running its build step.");
+function setEngine(text) {
+  state.engineText = text;
+  const el = $("#engine");
+  el.textContent = text ? `Video engine: ${text}` : "";
+  el.hidden = !text;
+}
+/* Downloads a file once, keeps it in the browser cache for next time, and reports progress. */
+async function fetchBlobURL(url, mime) {
+  let res, cache;
+  try { cache = await caches.open("ffmpeg-core-v1"); res = await cache.match(url); } catch {}
+  const cached = !!res;
+  if (cached) setEngine("loading from cache");
+  else {
+    res = await fetch(url);
+    if (!res.ok) throw new Error("download failed");
+    try { cache?.put(url, res.clone()); } catch {}
   }
+  const reader = res.body.getReader(), chunks = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); got += value.length;
+    if (!cached) setEngine(`downloading ${(got / 1048576).toFixed(1)} MB (first time only)`);
+  }
+  return URL.createObjectURL(new Blob(chunks, { type: mime }));
+}
+function getFFmpeg() {
+  if (!state.enginePromise) state.enginePromise = loadFFmpeg().catch(error => { state.enginePromise = null; throw error; });
+  return state.enginePromise;
+}
+async function loadFFmpeg() {
+  let FFmpeg;
+  try { ({ FFmpeg } = await import("/vendor/ffmpeg/index.js")); }
+  catch { throw new Error("The video engine is missing. Deploy the full project after running its build step."); }
   let lastError;
   for (const base of CORE_BASES) {
     const ff = new FFmpeg();
@@ -424,16 +457,17 @@ async function getFFmpeg() {
       if (state.clipTotal) setBar((state.clipIndex + pct / 100) / state.clipTotal);
     });
     try {
-      $("#busy-text").textContent = "Loading the video engine (first time only)...";
-      await ff.load({
-        coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, "application/wasm")
-      });
+      const coreURL = await fetchBlobURL(`${base}/ffmpeg-core.js`, "text/javascript");
+      const wasmURL = await fetchBlobURL(`${base}/ffmpeg-core.wasm`, "application/wasm");
+      setEngine("starting");
+      await ff.load({ coreURL, wasmURL });
       state.ffmpeg = ff;
+      setEngine("ready");
       return ff;
     } catch (error) { lastError = error; }
   }
   console.error(lastError);
+  setEngine("");
   throw new Error("Could not download the video engine. Check your connection and try again.");
 }
 /* Mount the file read-only instead of copying it into memory (falls back to a copy if unsupported). */
@@ -506,7 +540,7 @@ async function makeClips(highlights, clips) {
     const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
     if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
     else {
-      args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
+      args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "26", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
     }
     const code = await Promise.race([ff.exec(args), state.cancelPromise]);
     if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
@@ -534,8 +568,9 @@ async function run() {
     const invalid = clips.find(clip => clip.end > state.duration + 0.5);
     if (invalid) throw new Error(`Clip ${formatTime(invalid.start)}–${formatTime(invalid.end)} ends after the uploaded video.`);
     const overlap = findOverlaps(clips);
-    showBusy(true, "AI is reading your notes and writing captions...");
+    showBusy(true, "AI is writing your captions...");
     await keepAwake(true);
+    const engine = getFFmpeg(); engine.catch(() => {}); // load the video engine while the AI works
     const result = await callAI(clips, state.abort.signal);
     if (!result.highlights?.length) throw new Error("The AI did not return any clips. Check the timestamp notes and try again.");
     $("#status").textContent = `${result.highlights.length} timestamp ranges processed. Cutting your clips now...`;
@@ -563,7 +598,7 @@ function cancel() {
   state.cancelled = true;
   state.abort?.abort();
   state.rejectCancel?.();
-  if (state.ffmpeg) { try { state.ffmpeg.terminate(); } catch {} state.ffmpeg = null; state.input = null; }
+  if (state.ffmpeg) { try { state.ffmpeg.terminate(); } catch {} state.ffmpeg = null; state.enginePromise = null; state.input = null; setEngine(""); }
 }
 async function regenerate(i, button) {
   const item = state.outputs[i];
@@ -592,8 +627,8 @@ function updateWarnings(file) {
 }
 function updateModeHint() {
   $("#mode-hint").textContent = $("#mode").value === "fast"
-    ? "Fast mode copies the video without re-encoding. It is quick and light on memory, but a clip may begin up to a few seconds early (at the nearest keyframe)."
-    : "Accurate mode cuts precisely but takes longer.";
+    ? "Fast mode copies the video without re-encoding, so it is near-instant and light on memory. A clip can begin a little early (at the nearest keyframe), which your 2-second padding already covers."
+    : "Exact mode re-encodes each clip in your browser, which can take several times the clip length. Use it only if Fast mode cuts at the wrong place.";
 }
 function selectFile(file) {
   if (!file) return;
@@ -601,6 +636,7 @@ function selectFile(file) {
   if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
   unmountInput(state.ffmpeg);
   resetOutputs();
+  getFFmpeg().catch(() => {}); // start loading the video engine now
   $("#status").textContent = "";
   state.file = file;
   state.duration = 0;
@@ -788,7 +824,6 @@ $("#paste").addEventListener("click", async () => {
   } catch { toast("Clipboard access was blocked. Long-press the box and choose Paste.", true); }
 });
 $("#clear").addEventListener("click", () => { $("#notes").value = ""; notesChanged(); });
-if (IS_MOBILE) $("#mode").value = "fast";
 $("#mode").addEventListener("change", updateModeHint);
 updateModeHint();
 renderPrompt();
