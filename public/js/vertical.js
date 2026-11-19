@@ -56,7 +56,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
       output,
       video: {
         codec: "avc",
-        bitrate: 8_000_000,
+        bitrate: 5_000_000,
         hardwareAcceleration: "prefer-hardware",
         processedWidth: W,
         processedHeight: H * 2,
@@ -73,7 +73,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
               : Object.assign(document.createElement("canvas"), { width: W, height: H * 2 });
             ctx = canvas.getContext("2d", { alpha: false });
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
+            ctx.imageSmoothingQuality = "medium";
           }
           if (frame.fit) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H * 2); }
           for (const { m, yOff } of boxes) {
@@ -82,7 +82,6 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
           return ctx.canvas;
         },
       },
-      audio: { codec: "aac" },
     });
     if (!conversion.isValid) return null;
     if (onProgress) conversion.onProgress = onProgress;

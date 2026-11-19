@@ -37,21 +37,21 @@ function toast(message, error = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.hidden = true, error ? 6500 : 2800);
 }
-function bytesToBase64(bytes) {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return btoa(bin);
+function blobSliceToBase64(slice) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.readAsDataURL(slice);
+  });
 }
 async function download(blob, name) {
   if (window.AndroidDownloader?.startSave) {
+    toast(`Saving ${name}...`);
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const CHUNK = 512 * 1024;
+    const CHUNK = 2 * 1024 * 1024;
     window.AndroidDownloader.startSave(id);
     for (let offset = 0; offset < blob.size; offset += CHUNK) {
-      const buf = await blob.slice(offset, offset + CHUNK).arrayBuffer();
-      window.AndroidDownloader.appendSave(id, bytesToBase64(new Uint8Array(buf)));
+      window.AndroidDownloader.appendSave(id, await blobSliceToBase64(blob.slice(offset, offset + CHUNK)));
     }
     window.AndroidDownloader.finishSave(id, name, blob.type || "application/octet-stream");
     return;
