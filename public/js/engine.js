@@ -56,15 +56,18 @@ async function mountInput(ff) {
   await unmountInput(ff);
   const ext = state.file.name.match(/\.[a-z0-9]{1,5}$/i)?.[0]?.toLowerCase() || ".mp4";
   const safe = new File([state.file], `source${ext}`, { type: state.file.type });
-  try {
-    await ff.createDir(MOUNT);
-    await ff.mount("WORKERFS", { files: [safe] }, MOUNT);
-    state.input = { type: "mount", path: `${MOUNT}/${safe.name}` };
-  } catch {
-    try { await ff.deleteDir(MOUNT); } catch {}
-    await ff.writeFile(safe.name, new Uint8Array(await safe.arrayBuffer()));
-    state.input = { type: "file", path: safe.name };
+  if (!window.AndroidClipper) {
+    try {
+      await ff.createDir(MOUNT);
+      await ff.mount("WORKERFS", { files: [safe] }, MOUNT);
+      state.input = { type: "mount", path: `${MOUNT}/${safe.name}` };
+      return state.input.path;
+    } catch {
+      try { await ff.deleteDir(MOUNT); } catch {}
+    }
   }
+  await ff.writeFile(safe.name, new Uint8Array(await safe.arrayBuffer()));
+  state.input = { type: "file", path: safe.name };
   return state.input.path;
 }
 async function unmountInput(ff) {
