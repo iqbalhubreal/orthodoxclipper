@@ -1,5 +1,16 @@
 "use strict";
-/* Loads ffmpeg.wasm and mounts the uploaded video. */
+/* Loads WebCodecs (Mediabunny) for hardware-accelerated encoding, with ffmpeg.wasm as fallback. */
+async function getMediabunny() {
+  if (typeof VideoDecoder === "undefined" || typeof VideoEncoder === "undefined") return null;
+  if (state.mb) return state.mb;
+  for (const url of MEDIABUNNY_URLS) {
+    try {
+      state.mb = await import(url);
+      return state.mb;
+    } catch {}
+  }
+  return null;
+}
 async function getFFmpeg() {
   if (state.ffmpeg) return state.ffmpeg;
   let FFmpeg, toBlobURL;

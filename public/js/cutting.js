@@ -1,12 +1,47 @@
 "use strict";
-/* Cutting clips (Fast/Accurate), the main Create button, cancel, rewrite caption. */
+/* Cutting clips (Fast/Accurate with WebCodecs hardware acceleration + FFmpeg fallback), cancel, rewrite caption. */
+async function cutWithWebCodecs(cutStart, cutEnd, onProgress) {
+  const mb = await getMediabunny();
+  if (!mb || state.cancelled) return null;
+  const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(state.file) });
+  const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
+  try {
+    const trim = { start: cutStart };
+    if (Number.isFinite(cutEnd)) trim.end = cutEnd;
+    const conversion = await Conversion.init({
+      input,
+      output,
+      trim,
+      video: { codec: "avc" },
+      audio: { codec: "aac" },
+    });
+    if (!conversion.isValid) return null;
+    if (onProgress) conversion.onProgress = onProgress;
+    state.activeConversion = conversion;
+    await conversion.execute();
+    return new Blob([output.target.buffer], { type: "video/mp4" });
+  } catch (error) {
+    if (state.cancelled) throw error;
+    console.warn("WebCodecs cut unavailable, falling back to FFmpeg:", error);
+    return null;
+  } finally {
+    state.activeConversion = null;
+    try { input.dispose?.(); } catch {}
+  }
+}
 async function makeClips(highlights, clips) {
-  const ff = await Promise.race([getFFmpeg(), state.cancelPromise]);
-  showBusy(true, "Opening your video...");
-  const input = await Promise.race([mountInput(ff), state.cancelPromise]);
   resetOutputs();
   state.sessionUrl = $("#yt").value.trim(); state.sessionNotes = $("#notes").value;
   const fast = $("#mode").value === "fast";
+  let ff = null, input = null;
+  const ensureFFmpegInput = async () => {
+    if (ff && input) return;
+    ff = await Promise.race([getFFmpeg(), state.cancelPromise]);
+    showBusy(true, "Opening your video...");
+    input = await Promise.race([mountInput(ff), state.cancelPromise]);
+  };
+  if (fast) await ensureFFmpegInput();
   state.clipTotal = highlights.length; state.laps = [];
   for (let i = 0; i < highlights.length; i++) {
     const h = highlights[i];
@@ -14,24 +49,36 @@ async function makeClips(highlights, clips) {
     setBar(i / highlights.length);
     showBusy(true, state.progressMessage); // restarts the stopwatch for this clip
     const began = performance.now();
-    const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
     const cutStart = Math.max(0, h.start - PAD);
     const cutEnd = Math.min(state.duration || Infinity, h.end + PAD);
-    const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
-    if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
-    else {
-      args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
+    let blob = null;
+    if (!fast) {
+      blob = await Promise.race([
+        cutWithWebCodecs(cutStart, cutEnd, p => setBar((i + p) / highlights.length)),
+        state.cancelPromise,
+      ]);
+      if (blob) showBusy(true, state.progressMessage);
     }
-    const code = await Promise.race([ff.exec(args, fast ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
-    if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. This phone may be too slow or low on memory for this video. Try a shorter or smaller H.264 MP4.`);
-    if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
-    const bytes = await ff.readFile(output);
-    try { await ff.deleteFile(output); } catch {}
+    if (!blob) {
+      await ensureFFmpegInput();
+      showBusy(true, state.progressMessage);
+      const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
+      const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
+      if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
+      else {
+        args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
+      }
+      const code = await Promise.race([ff.exec(args, fast ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
+      if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. This phone may be too slow or low on memory for this video. Try a shorter or smaller H.264 MP4.`);
+      if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
+      const bytes = await ff.readFile(output);
+      try { await ff.deleteFile(output); } catch {}
+      blob = new Blob([bytes], { type: "video/mp4" });
+    }
     const cutSeconds = (performance.now() - began) / 1000;
     state.laps.push(`Clip ${i + 1} cut in ${cutSeconds.toFixed(1)} s`);
     $("#busy-lap").innerHTML = state.laps.slice(-4).map(t => `<div>${escapeHTML(t)}</div>`).join("");
     const title = h.title || `Clip ${i + 1}`;
-    const blob = new Blob([bytes], { type: "video/mp4" });
     const item = { ...h, note: clips[i].note, title, blob, cutSeconds, tagsText: tagsText(h.tags), name: `${String(i + 1).padStart(2,"0")}-${slug(title)}.mp4`, url: URL.createObjectURL(blob) };
     state.outputs.push(item);
     $("#clip-list").insertAdjacentHTML("beforeend", cardHTML(item, state.outputs.length - 1));
@@ -90,6 +137,8 @@ async function run() {
 function cancel() {
   state.cancelled = true;
   state.abort?.abort();
+  try { state.activeConversion?.cancel(); } catch {}
+  state.activeConversion = null;
   state.rejectCancel?.();
   if (state.ffmpeg) { try { state.ffmpeg.terminate(); } catch {} state.ffmpeg = null; state.input = null; }
 }

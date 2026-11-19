@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical split-screen: box data, the FFmpeg filter, and rendering the vertical clips. */
+/* Vertical split-screen: box data, WebCodecs hardware rendering, and FFmpeg fallback. */
 /* ---------- Optional step after cutting: vertical split-screen ---------- */
 const ASPECT = 9 / 8; // each half of the output is 9:8, so two stacked halves make a 9:16 video
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -42,18 +42,77 @@ async function runTask(fn, message) {
     showBusy(false);
   }
 }
-async function makeVertical(ff, i, frame) {
-  const item = state.outputs[i], tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
-  await ff.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
-  const code = await Promise.race([ff.exec([
-    "-i", tmpIn, "-filter_complex", verticalFilter(frame), "-map", "[v]", "-map", "0:a?",
-    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut
-  ]), state.cancelPromise]);
-  if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);
-  const bytes = await ff.readFile(tmpOut);
-  try { await ff.deleteFile(tmpIn); await ff.deleteFile(tmpOut); } catch {}
+async function makeVerticalWebCodecs(item, frame, onProgress) {
+  const mb = await getMediabunny();
+  if (!mb || state.cancelled) return null;
+  const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
+  const W = IS_MOBILE ? 720 : 1080, H = W * 8 / 9;
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
+  const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
+  let ctx = null, boxes = null;
+  try {
+    const conversion = await Conversion.init({
+      input,
+      output,
+      video: {
+        codec: "avc",
+        processedWidth: W,
+        processedHeight: H * 2,
+        process: (sample) => {
+          if (!ctx) {
+            const sw = sample.displayWidth, sh = sample.displayHeight;
+            const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
+            boxes = [
+              { m: mapBox(px(frame.a), W, H, frame.fit), yOff: 0 },
+              { m: mapBox(px(frame.b), W, H, frame.fit), yOff: H },
+            ];
+            const canvas = typeof OffscreenCanvas !== "undefined"
+              ? new OffscreenCanvas(W, H * 2)
+              : Object.assign(document.createElement("canvas"), { width: W, height: H * 2 });
+            ctx = canvas.getContext("2d", { alpha: false });
+          }
+          if (frame.fit) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H * 2); }
+          for (const { m, yOff } of boxes) {
+            sample.draw(ctx, m.sx, m.sy, m.sw, m.sh, m.dx, yOff + m.dy, m.dw, m.dh);
+          }
+          return ctx.canvas;
+        },
+      },
+      audio: { codec: "aac" },
+    });
+    if (!conversion.isValid) return null;
+    if (onProgress) conversion.onProgress = onProgress;
+    state.activeConversion = conversion;
+    await conversion.execute();
+    return new Blob([output.target.buffer], { type: "video/mp4" });
+  } catch (error) {
+    if (state.cancelled) throw error;
+    console.warn("WebCodecs vertical unavailable, falling back to FFmpeg:", error);
+    return null;
+  } finally {
+    state.activeConversion = null;
+    try { input.dispose?.(); } catch {}
+  }
+}
+async function makeVertical(ff, i, frame, onProgress) {
+  const item = state.outputs[i];
+  let vBlob = await Promise.race([makeVerticalWebCodecs(item, frame, onProgress), state.cancelPromise]);
+  if (!vBlob) {
+    const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
+    showBusy(true, state.progressMessage);
+    const tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
+    await engine.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
+    const code = await Promise.race([engine.exec([
+      "-i", tmpIn, "-filter_complex", verticalFilter(frame), "-map", "[v]", "-map", "0:a?",
+      "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut
+    ]), state.cancelPromise]);
+    if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);
+    const bytes = await engine.readFile(tmpOut);
+    try { await engine.deleteFile(tmpIn); await engine.deleteFile(tmpOut); } catch {}
+    vBlob = new Blob([bytes], { type: "video/mp4" });
+  }
   if (item.vUrl) URL.revokeObjectURL(item.vUrl);
-  item.vBlob = new Blob([bytes], { type: "video/mp4" });
+  item.vBlob = vBlob;
   item.vUrl = URL.createObjectURL(item.vBlob);
   item.vName = item.name.replace(/\.mp4$/, "") + "-vertical.mp4";
   const box = $(`#vbox-${i}`);
@@ -65,11 +124,11 @@ async function makeVertical(ff, i, frame) {
 async function makeVerticalBatch(indices, frame) {
   state.lastFrame = clone(frame);
   state.clipTotal = indices.length;
-  const ff = await getFFmpeg();
   for (let n = 0; n < indices.length; n++) {
     state.clipIndex = n;
     state.progressMessage = `Making clip ${indices[n] + 1} vertical (${n + 1} of ${indices.length})...`;
     showBusy(true, state.progressMessage); setBar(n / indices.length);
-    await makeVertical(ff, indices[n], frame);
+    await makeVertical(state.ffmpeg, indices[n], frame, p => setBar((n + p) / indices.length));
   }
+  setBar(1);
 }

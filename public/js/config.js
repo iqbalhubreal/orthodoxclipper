@@ -1,10 +1,14 @@
 "use strict";
 /* Shared state, constants and the DOM helper. Loaded first; every later file uses these. */
 const $ = (s) => document.querySelector(s);
-const state = { vw: 0, vh: 0, lastFrame: null, edVideo: null, file: null, fileUrl: null, duration: 0, busy: false, ffmpeg: null, input: null, outputs: [], laps: [], historyId: null, sessionUrl: "", sessionNotes: "", progressMessage: "", cancelled: false, abort: null, cancelPromise: null, rejectCancel: null };
+const state = { vw: 0, vh: 0, lastFrame: null, edVideo: null, file: null, fileUrl: null, duration: 0, busy: false, ffmpeg: null, input: null, mb: null, activeConversion: null, outputs: [], laps: [], historyId: null, sessionUrl: "", sessionNotes: "", progressMessage: "", cancelled: false, abort: null, cancelPromise: null, rejectCancel: null };
 const CORE_BASES = [
   "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm",
   "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
+];
+const MEDIABUNNY_URLS = [
+  "https://cdn.jsdelivr.net/npm/mediabunny@1/+esm",
+  "https://unpkg.com/mediabunny@1/+esm"
 ];
 const MOUNT = "/input";
 const AI_TIMEOUT_MS = 45000;
