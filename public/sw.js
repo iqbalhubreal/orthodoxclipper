@@ -2,8 +2,8 @@
    - Pages, /js/* and /css/*: network first (so a new deploy never mixes old and new files), cached copy when offline.
    - Other own static files (icons, vendor/ffmpeg wrappers): stale-while-revalidate.
    - The ~31 MB ffmpeg core and mediabunny from the CDN: cached after the first download, so later cutting works offline.
-   - Never touches /api/*, /__native_clip__/*, non-GET requests, or anything else cross-origin (YouTube, etc). */
-const VERSION = "clipper-v1.11.13";
+   - Never touches /api/*, /__native_clip__/*, .zip downloads, non-GET requests, or anything else cross-origin (YouTube, etc). */
+const VERSION = "clipper-v1.11.14";
 const SHELL = `${VERSION}-shell`;
 const CORE = "clipper-ffmpeg-core-0.12.6"; // not tied to the app version: the engine rarely changes
 const PRECACHE = [
@@ -29,7 +29,7 @@ self.addEventListener("fetch", event => {
   if (req.method !== "GET" || req.headers.has("range")) return;
 
   if (isCore(url)) { event.respondWith(coreFirst(req)); return; }
-  if (url.origin !== location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/__native_clip__/")) return;
+  if (url.origin !== location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/__native_clip__/") || url.pathname.endsWith(".zip")) return;
 
   if (req.mode === "navigate") { event.respondWith(networkFirst(req, "/")); return; }
   if (url.pathname === "/sw.js") return;
