@@ -22,8 +22,8 @@ function parseNotes(text) {
     if (!line) { open = false; continue; }
     const m = RANGE_RE.exec(line);
     if (m && m.index <= MAX_BEFORE) {
-      const before = line.slice(0, m.index).replace(/^(?:[>#*•\-]+\s*|\d+[.)]\s+)+/, "").replace(/^[\[(\s]+/, "").replace(/[\s([{:|\\-–—]+$/, "");
-      const after = line.slice(m.index + m[0].length).replace(/^[\s|:;,.\\])}>\-\u2013\u2014]+/, "");
+      const before = line.slice(0, m.index).replace(/^(?:[>#*•\-]+\s*|\d+[.)]\s+)+/, "").replace(/^[\[(\s]+/, "").replace(/[\s([{:|\-–—]+$/, "");
+      const after = line.slice(m.index + m[0].length).replace(/^[\s|:;,.\])}>\-–—]+/, "");
       clips.push({ start: parseTime(m[1]), end: parseTime(m[2]), note: [before, after].filter(Boolean).join(": ") });
       open = true;
     } else if (/^#/.test(line)) { open = false;
