@@ -7,15 +7,9 @@ function tickClock() {
   $("#busy-clock").textContent = t;
   $("#busy-mini-clock").textContent = t;
   if (/vertical/i.test(stageName)) {
-    if (ms > 180000) {
-      $("#busy-note").textContent = IS_ANDROID_APP
-        ? "Still working, keep going..."
-        : "Taking over 3 minutes. Try the Android app for faster performance.";
-    } else {
-      $("#busy-note").textContent = IS_ANDROID_APP
-        ? "Estimated time: ~3 minutes per clip."
-        : "Estimated time: ~3 minutes per clip. Download the Android app below for faster performance.";
-    }
+    $("#busy-note").textContent = ms > 180000
+      ? "Still working, keep going..."
+      : "Estimated time: ~3 minutes per clip.";
   } else {
     $("#busy-note").textContent = ms > 60000 ? "Still working. If nothing changes, press Cancel and try again." : "";
   }

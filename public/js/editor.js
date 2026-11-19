@@ -37,6 +37,12 @@ function edFitStage() {
   if (window.CSS && CSS.supports("height", "1dvh")) $("#ed-stage").style.maxWidth = `calc(52dvh * ${state.vw / state.vh})`;
 }
 async function openEditor(i) {
+  if (!IS_ANDROID_APP) {
+    toast("Download the Android app for this feature.", true);
+    $("#status").textContent = "Download the Android app to use the Vertical Maker.";
+    $("#app-note")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   const item = state.outputs[i];
   if (!item || state.busy) return;
   const v = state.edVideo = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.url });

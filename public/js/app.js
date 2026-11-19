@@ -29,6 +29,8 @@ if (IS_ANDROID_APP) {
   if (appNote) appNote.hidden = true;
 } else {
   setMode("fast");
+  const vall = $("#vall");
+  if (vall) vall.textContent = "Make all vertical (Android app only)";
 }
 renderPrompt();
 renderDetected();

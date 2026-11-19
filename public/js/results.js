@@ -56,6 +56,7 @@ document.addEventListener("click", onCaptionClick);
 document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("cap-view")) { e.preventDefault(); onCaptionClick(e); } });
 
 function cardHTML(item, i) {
+  const vertLabel = IS_ANDROID_APP ? "Make vertical" : "Make vertical (Android app only)";
   return `<article class="clip" data-i="${i}">
       <div class="clip-head"><div class="clip-title">${escapeHTML(item.title || `Clip ${i + 1}`)}</div><div class="clip-time">${formatTime(item.start)}–${formatTime(item.end)} (±${PAD}s)</div></div>
       <video controls playsinline preload="metadata" src="${item.url}"></video>
@@ -65,7 +66,7 @@ function cardHTML(item, i) {
         <button class="btn primary" data-copy="${i}" type="button">Copy caption + hashtags</button>
         <a class="btn" href="${item.url}" download="${escapeHTML(item.name)}">Download MP4</a>
         <button class="btn" data-regen="${i}" type="button">Rewrite caption</button>
-        <button class="btn" data-vert="${i}" type="button">Make vertical</button>
+        <button class="btn" data-vert="${i}" type="button">${vertLabel}</button>
       </div>
       <div class="vbox" id="vbox-${i}" hidden></div>
     </article>`;
