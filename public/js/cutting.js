@@ -1,5 +1,5 @@
 "use strict";
-/* Cutting clips (Native Android / Fast copy / WebCodecs Accurate + FFmpeg fallback), cancel, rewrite caption. */
+/* Cutting clips: Web uses ffmpeg.wasm; Android app uses WebCodecs hardware acceleration (with FFmpeg fallback). */
 let nativeCutSeq = 0;
 const nativeCutPending = new Map();
 window.__nativeCutDone = (id, ok, value) => {
@@ -64,7 +64,7 @@ async function makeClips(highlights, clips) {
     showBusy(true, "Opening your video...");
     input = await Promise.race([mountInput(ff), state.cancelPromise]);
   };
-  if (fast && !window.AndroidClipper?.cutFast) await ensureFFmpegInput();
+  if (!IS_ANDROID_APP) await ensureFFmpegInput();
   state.clipTotal = highlights.length; state.laps = [];
   for (let i = 0; i < highlights.length; i++) {
     const h = highlights[i];
@@ -76,13 +76,10 @@ async function makeClips(highlights, clips) {
     const cutEnd = Math.min(state.duration || Infinity, h.end + PAD);
     const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
     let blob = null;
-    if (fast) {
-      blob = await Promise.race([cutWithAndroidNative(cutStart, cutEnd, output), state.cancelPromise]);
-    } else {
-      blob = await Promise.race([
-        cutWithWebCodecs(cutStart, cutEnd, p => setBar((i + p) / highlights.length)),
-        state.cancelPromise,
-      ]);
+    if (IS_ANDROID_APP) {
+      blob = fast
+        ? await Promise.race([cutWithAndroidNative(cutStart, cutEnd, output), state.cancelPromise])
+        : await Promise.race([cutWithWebCodecs(cutStart, cutEnd, p => setBar((i + p) / highlights.length)), state.cancelPromise]);
       if (blob) showBusy(true, state.progressMessage);
     }
     if (!blob) {

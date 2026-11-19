@@ -1,7 +1,6 @@
 "use strict";
 /* Wires up buttons and inputs. Runs after everything else is defined. */
 /* Wire up */
-const IS_ANDROID_APP = !!window.AndroidClipper || new URLSearchParams(location.search).get("app") === "android";
 try { $("#notes").value = localStorage.getItem("clipper.notes") || ""; } catch {}
 $("#notes").addEventListener("input", notesChanged);
 $("#maxlen").addEventListener("change", () => { renderPrompt(); renderDetected(); });
@@ -25,6 +24,8 @@ if (IS_ANDROID_APP) {
   setMode("accurate");
   const modeRow = $(".mode-row");
   if (modeRow) modeRow.hidden = true;
+  const appNote = $("#app-note");
+  if (appNote) appNote.hidden = true;
 } else {
   setMode("fast");
 }

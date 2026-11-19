@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical split-screen: box data, WebCodecs hardware rendering (1080x1920), and FFmpeg fallback. */
+/* Vertical split-screen: Web uses ffmpeg.wasm; Android app uses WebCodecs hardware rendering (1080x1920) with FFmpeg fallback. */
 /* ---------- Optional step after cutting: vertical split-screen ---------- */
 const ASPECT = 9 / 8; // each half of the output is 9:8, so two stacked halves make a 9:16 video
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -100,7 +100,9 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
 }
 async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
-  let vBlob = await Promise.race([makeVerticalWebCodecs(item, frame, onProgress), state.cancelPromise]);
+  let vBlob = IS_ANDROID_APP
+    ? await Promise.race([makeVerticalWebCodecs(item, frame, onProgress), state.cancelPromise])
+    : null;
   if (!vBlob) {
     const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
     showBusy(true, state.progressMessage);

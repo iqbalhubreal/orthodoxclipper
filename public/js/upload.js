@@ -2,8 +2,8 @@
 /* Video upload handling, file warnings and the Fast/Accurate hint. */
 function updateWarnings(file) {
   const mb = file.size / 1048576, notes = [];
-  if (IS_MOBILE && mb > 300) notes.push("Large video for a phone.");
-  else if (mb > 2000) notes.push("Video is over 2 GB and may fail in the browser.");
+  if (!IS_ANDROID_APP && IS_MOBILE && mb > 300) notes.push("Large video for a phone.");
+  else if (!IS_ANDROID_APP && mb > 2000) notes.push("Video is over 2 GB and may fail in the browser.");
   $("#warn").textContent = notes.join(" ");
   $("#warn").hidden = !notes.length;
 }
