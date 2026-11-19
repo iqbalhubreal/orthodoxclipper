@@ -73,6 +73,8 @@ function cardHTML(item, i) {
 function updateResultsHeader() {
   $("#results").hidden = !state.outputs.length;
   $("#result-count").textContent = `${state.outputs.length} ready`;
+  const zv = $("#zip-vert");
+  if (zv) zv.hidden = !state.outputs.some(o => o.vBlob);
 }
 function resetOutputs() {
   state.outputs.forEach(item => { URL.revokeObjectURL(item.url); if (item.vUrl) URL.revokeObjectURL(item.vUrl); });

@@ -1,6 +1,5 @@
 "use strict";
-/* Store-only ZIP writer (no library) and the Download all button. */
-/* Store-only ZIP writer (MP4 is already compressed), so no library is needed. */
+/* Store-only ZIP writer (no library) and the Download all / Download vertical buttons. */
 const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 function crc32(buf) { let crc = -1; for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buf[i]) & 255]; return (crc ^ -1) >>> 0; }
 async function makeZip(files) {
@@ -38,7 +37,19 @@ async function downloadZip() {
     const files = state.outputs.flatMap(o => [{ name: o.name, blob: o.blob }, ...(o.vBlob ? [{ name: o.vName, blob: o.vBlob }] : [])]);
     const captions = state.outputs.map((o, i) => `Clip ${i + 1}: ${o.title}  (${formatTime(o.start)}-${formatTime(o.end)})\n${shareText(o)}`).join("\n\n---\n\n");
     files.push({ name: "captions.txt", blob: new Blob([captions], { type: "text/plain" }) });
-    download(await makeZip(files), "orthodox-clips.zip");
+    await download(await makeZip(files), "orthodox-clips.zip");
   } catch (error) { toast(error.message || "Could not build the zip.", true); }
   finally { btn.disabled = false; btn.textContent = "Download all (.zip)"; }
+}
+async function downloadVerticalZip() {
+  const items = state.outputs.filter(o => o.vBlob);
+  if (!items.length) return;
+  const btn = $("#zip-vert"); btn.disabled = true; btn.textContent = "Preparing zip...";
+  try {
+    const files = items.map(o => ({ name: o.vName, blob: o.vBlob }));
+    const captions = items.map((o, i) => `Clip ${i + 1}: ${o.title}  (${formatTime(o.start)}-${formatTime(o.end)})\n${shareText(o)}`).join("\n\n---\n\n");
+    files.push({ name: "captions.txt", blob: new Blob([captions], { type: "text/plain" }) });
+    await download(await makeZip(files), "orthodox-vertical-clips.zip");
+  } catch (error) { toast(error.message || "Could not build the zip.", true); }
+  finally { btn.disabled = false; btn.textContent = "Download vertical (.zip)"; }
 }

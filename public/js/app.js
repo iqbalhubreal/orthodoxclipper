@@ -37,6 +37,7 @@ $("#cancel").addEventListener("click", cancel);
 $("#busy-min").addEventListener("click", () => setBusyMinimized(true));
 $("#busy-max").addEventListener("click", () => setBusyMinimized(false));
 $("#zip").addEventListener("click", downloadZip);
+$("#zip-vert").addEventListener("click", downloadVerticalZip);
 $("#vall").addEventListener("click", () => openEditor(0));
 $("#file").addEventListener("change", e => selectFile(e.target.files?.[0]));
 const drop = $("#drop");

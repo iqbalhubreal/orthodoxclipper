@@ -125,6 +125,7 @@ async function makeVertical(ff, i, frame, onProgress) {
   box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a></div>`;
   const btn = document.querySelector(`button[data-vert="${i}"]`);
   if (btn) btn.textContent = "Redo vertical";
+  updateResultsHeader();
 }
 async function makeVerticalBatch(indices, frame) {
   state.lastFrame = clone(frame);
