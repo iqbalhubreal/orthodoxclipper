@@ -63,7 +63,7 @@ $("#clip-list").addEventListener("click", e => {
   const vert = e.target.closest("button[data-vert]");
   if (vert) return openEditor(Number(vert.dataset.vert));
   const vedit = e.target.closest("button[data-vedit]");
-  if (vedit) return openVerticalEditor(Number(vedit.dataset.vedit));
+  if (vedit) return openVerticalEditor(Number(vedit.dataset.vedit), { postVertical: true });
   const regen = e.target.closest("button[data-regen]");
   if (regen) regenerate(Number(regen.dataset.regen), regen);
 });
