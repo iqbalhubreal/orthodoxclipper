@@ -1,0 +1,1216 @@
+<!doctype html>
+<html lang="en" translate="no" class="notranslate">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101116">
+<meta name="google" content="notranslate">
+<meta http-equiv="Content-Language" content="en">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>The Orthodox Muslim | Clip Maker</title>
+<style>
+:root{color-scheme:dark;--bg:#101116;--panel:#191b23;--panel2:#222530;--line:#303442;--text:#f1f2f6;--muted:#a2a8b7;--accent:#8b79ff;--accent2:#b7adff;--good:#42c98b;--bad:#ff7474;--warn:#f0b35a;--radius:16px}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+header{padding:18px 20px;border-bottom:1px solid var(--line);background:#14151b}
+.head{max-width:900px;margin:auto;display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;font-size:19px}
+h1{font-size:18px;line-height:1.2;margin:0;font-weight:750;letter-spacing:-.02em}
+.subhead{font-size:12px;color:var(--muted);margin-top:3px}
+main{width:min(900px,100%);margin:26px auto;padding:0 16px 70px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.section-title{margin:0 0 8px;font-size:16px;font-weight:700}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+#drop{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:150px;padding:22px;border:2px dashed #45495a;border-radius:13px;background:#151720;cursor:pointer;transition:border-color .15s,background .15s}
+#drop:hover,#drop.over{border-color:var(--accent);background:#1b1b2a}
+#drop-icon{font-size:27px;margin-bottom:7px}
+#file-name{font-weight:650;overflow-wrap:anywhere}
+#file-meta{font-size:12px;color:var(--muted);margin-top:4px}
+.warn{margin-top:10px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:#2a2314;color:#ffe0ac;font-size:13px}
+#notes{display:block;width:100%;min-height:205px;resize:vertical;background:#12141b;border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:14px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none}
+#notes:focus,.caption-edit:focus,.tags-edit:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 2px #8b79ff22;outline:none}
+.example{margin-top:10px;padding:10px 12px;background:#14161e;border-radius:10px;color:var(--muted);font:12px/1.7 ui-monospace,monospace;white-space:pre-wrap}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.opts label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:650;color:var(--muted)}
+select{-webkit-appearance:none;appearance:none;background:#12141b url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%23a2a8b7' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right 12px center;border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;font-size:14px;cursor:pointer}
+#go{width:100%;margin-top:18px;border:0;border-radius:12px;padding:14px 18px;background:linear-gradient(100deg,#7965ed,#927dff);font-weight:750;font-size:15px;cursor:pointer}
+#go:disabled{opacity:.55;cursor:wait}
+#privacy{margin-top:10px;text-align:center;color:var(--muted);font-size:12px}
+#status{margin-top:20px;color:var(--muted);font-size:13px}
+#results{margin-top:22px}
+.results-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.results-head h2{margin:0;font-size:18px}
+#result-count{color:var(--muted);font-size:12px;margin-left:8px}
+.clip{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
+.clip-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.clip-title{font-weight:700;font-size:15px;overflow-wrap:anywhere}
+.clip-time{color:var(--muted);font:12px ui-monospace,monospace;white-space:nowrap;padding-top:3px}
+.clip video{display:block;width:100%;max-height:390px;aspect-ratio:16/9;object-fit:contain;background:#08090c;border-radius:10px;margin-top:12px}
+.clip video.vertical{aspect-ratio:9/16;max-height:520px;width:auto;max-width:100%;margin-inline:auto}
+.caption-label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-top:14px}
+.caption-edit,.tags-edit{display:block;width:100%;margin-top:6px;padding:11px 12px;background:#12141b;border:1px solid var(--line);border-radius:10px;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.caption-edit{min-height:76px;resize:vertical}
+.tags-edit{color:var(--accent2);font-size:13px}
+.clip-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border:1px solid var(--line);border-radius:9px;padding:8px 12px;background:var(--panel2);cursor:pointer;font-size:13px;font-weight:650}
+.btn.primary{background:#7764e8;border-color:#7764e8;color:white}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.55;cursor:wait}
+#busy{position:fixed;inset:0;z-index:30;background:#090a0ecf;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center}
+.busy-box{width:min(360px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+.busy-box .btn{margin-top:16px}
+.spinner{width:38px;height:38px;border:4px solid #383b4a;border-top-color:var(--accent);border-radius:50%;margin:0 auto 14px;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+#busy-text{font-weight:650}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:40;max-width:calc(100vw - 30px);padding:10px 15px;background:#292c38;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px #0008;font-size:13px}
+#toast.error{border-color:var(--bad);color:#ffd0d0}
+@media(max-width:600px){header{padding:14px 15px}main{margin:16px auto;padding:0 11px 50px}.panel{padding:14px}#drop{min-height:135px}.clip-head{display:block}.clip-time{margin-top:3px}.clip video{max-height:250px}.opts{grid-template-columns:1fr}}
+
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.how-card{display:flex;gap:11px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.how-ico{flex:none;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);color:var(--accent2);font-size:15px}
+.how-card h3{margin:0 0 3px;font-size:14px}
+.how-card p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.45}
+.num{display:inline-grid;place-items:center;width:24px;height:24px;margin-right:9px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);font-size:12.5px;font-weight:750;color:var(--accent2);vertical-align:1px}
+.num.done{background:var(--good);border-color:var(--good);color:#06130c}
+.sep{margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
+a{color:var(--accent2)}
+.opts label input{background:#12141b;border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-size:14px;font-weight:400;min-width:0}
+.opts label input:focus{border-color:var(--accent);box-shadow:0 0 0 2px #8b79ff22;outline:none}
+#prompt-box{margin:12px 0 0;padding:12px 14px;background:#12141b;border:1px solid var(--line);border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;color:#d6d9e6;max-height:250px;overflow:auto}
+.tools{display:flex;gap:8px;margin-bottom:8px}
+#detected{margin-top:10px;border:1px solid var(--line);border-radius:12px;background:#14161e;overflow:hidden}
+.det-head{padding:9px 12px;font-size:13px;font-weight:650}
+.det-head.good{color:var(--good)}.det-head.bad{color:#ffb1b1}
+#detected ul{list-style:none;margin:0;padding:0;max-height:270px;overflow:auto;border-top:1px solid var(--line)}
+#detected li{display:grid;grid-template-columns:108px 1fr;gap:2px 10px;padding:8px 12px;border-bottom:1px solid #22252f;font-size:13px}
+#detected li:last-child{border-bottom:0}
+.det-time{font:12px ui-monospace,monospace;color:var(--accent2);white-space:nowrap}
+.det-len{display:block;color:var(--muted);font-size:11.5px}
+.det-note{overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.det-flag{grid-column:2;font-size:12px;color:var(--warn)}.det-flag.bad{color:#ff9a9a}
+.more{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:#14161e}
+.more summary{cursor:pointer;padding:10px 0;font-size:13px;font-weight:650;color:var(--muted)}
+.more .opts{margin-top:4px}.more .hint{padding-bottom:12px}
+.bar{height:6px;background:#2a2d3a;border-radius:99px;margin-top:14px;overflow:hidden}
+#bar-fill{height:100%;width:0;background:linear-gradient(90deg,#7965ed,#927dff);transition:width .25s}
+@media(max-width:700px){.how{grid-template-columns:1fr}}
+#editor{position:fixed;inset:0;z-index:35;background:#090a0eeb;display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto;overscroll-behavior:contain}
+.ed-box{position:relative;width:min(900px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 16px 0}
+.ed-top{display:flex;align-items:center;gap:10px}
+.ed-top h3{flex:1;min-width:0;margin:0;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ed-x{flex:none;width:40px;height:40px;padding:0;font-size:16px}
+.ed-help{margin-top:8px}
+.ed-help summary{cursor:pointer;font-size:13px;font-weight:650;color:var(--accent2);padding:6px 0}
+.ed-body{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;margin-top:10px;align-items:start}
+.ed-stage{margin-inline:auto;width:100%}
+#ed-canvas{display:block;width:100%;height:auto;border-radius:10px;background:#000;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
+.ed-time{display:flex;flex-direction:column;gap:2px;margin-top:10px;font-size:12px;font-weight:650;color:var(--muted)}
+.ed-time input{width:100%;height:36px;accent-color:#8b79ff}
+.ed-side,.ed-tools{display:flex;flex-direction:column;gap:12px}
+#ed-prev{display:block;width:100%;max-width:140px;height:auto;margin-inline:auto;border:1px solid var(--line);border-radius:8px;background:#000}
+.ed-cap{font-size:11.5px;font-weight:650;color:var(--muted);margin:0 0 5px}
+.ed-seg{display:flex;padding:3px;gap:3px;background:#12141b;border:1px solid var(--line);border-radius:11px}
+.ed-seg button{flex:1;min-width:0;min-height:40px;padding:6px 8px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer}
+.ed-seg button.on{background:#7764e8;color:#fff}
+.ed-seg button[data-sel="a"].on{background:#6a58df}
+.ed-seg button[data-sel="b"].on{background:#2f9d6c}
+.ed-tool-row{display:flex;gap:8px}
+.ed-tool-row .btn{flex:1;min-height:40px}
+.ed-foot{position:sticky;bottom:0;z-index:2;display:flex;gap:8px;margin:14px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel);border-top:1px solid var(--line);border-radius:0 0 16px 16px}
+.ed-foot .btn{flex:1;min-height:46px;font-size:14px}
+.ed-foot .btn.primary{flex:1.4}
+@media(max-width:720px){
+  #editor{padding:0;background:var(--panel)}
+  .ed-box{display:flex;flex-direction:column;width:100%;min-height:100dvh;min-height:100vh;border:0;border-radius:0;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 0}
+  @supports(height:100dvh){.ed-box{min-height:100dvh}}
+  .ed-body{grid-template-columns:1fr;gap:10px}
+  .ed-side{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start}
+  #ed-prev{max-width:96px}
+  .ed-tools{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .ed-foot{margin:auto -12px 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));border-radius:0}
+}
+
+.head .header-btn{margin-left:auto}
+#open-history .count{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-left:7px;padding:0 5px;border-radius:99px;background:var(--accent);color:#fff;font-size:11px;font-weight:750}
+#open-history .count:empty{display:none}
+.mode-row{margin-top:18px}
+.mode-label{font-size:12px;font-weight:650;color:var(--muted);margin-bottom:6px}
+.seg{display:inline-flex;max-width:100%;padding:4px;gap:4px;background:#12141b;border:1px solid var(--line);border-radius:14px}
+.seg-btn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:136px;padding:8px 16px;border:0;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;text-align:left;transition:background .15s,color .15s}
+.seg-btn b{font-size:14px;font-weight:700}
+.seg-btn small{font-size:11.5px;opacity:.85}
+.seg-btn.on{background:#7764e8;color:#fff;box-shadow:0 2px 10px #7764e855}
+.seg-btn:not(.on):hover{background:var(--panel2);color:var(--text)}
+.seg-btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.mode-row .hint{margin-top:9px}
+#busy-clock{margin-top:10px;font:600 36px/1.1 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+#busy-lap{margin-top:10px;font-size:12.5px;color:var(--good);display:flex;flex-direction:column;gap:2px}
+#busy-note{margin-top:8px}
+.cut-time{margin-top:8px;font-size:12px;color:var(--good);font-weight:600}
+.cap-view{margin-top:6px;padding:11px 12px;background:#12141b;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.cap-view:hover,.cap-view:focus-visible{border-color:var(--accent);outline:none}
+.cap-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.cap-tags{margin:6px 0 0;color:var(--accent2);font-size:13px;overflow-wrap:anywhere}
+.cap-tags:empty{display:none}
+.cap-tools{margin-top:8px}
+.cap-editor .clip-actions{margin-top:10px}
+.btn.danger{background:#5a2222;border-color:var(--bad);color:#ffd0d0}
+.btn.del{color:#ffb1b1}
+#history{position:fixed;inset:0;z-index:32;background:#090a0eeb;display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto}
+.h-box{width:min(860px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:20px}
+.h-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.h-top h3{margin:0;font-size:18px}
+.h-empty{margin:26px 0 10px;text-align:center;color:var(--muted)}
+.h-entry{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:#14161e;overflow:hidden}
+.h-head{display:flex;align-items:center;gap:10px;padding:12px 14px}
+.h-toggle{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit}
+.h-title{font-weight:700;font-size:14.5px}
+.h-sub{font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.h-body{padding:2px 14px 14px;border-top:1px solid var(--line)}
+.h-body pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.6 ui-monospace,monospace;color:#d6d9e6;background:#12141b;border:1px solid var(--line);border-radius:10px;padding:10px 12px;max-height:220px;overflow:auto;margin:8px 0 0}
+.h-body details{margin-top:12px}
+.h-body summary{cursor:pointer;font-size:13px;font-weight:650;color:var(--muted)}
+.h-clip{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line)}
+.preview{position:relative;aspect-ratio:16/9;margin-top:12px;border-radius:10px;overflow:hidden;background:#08090c;border:1px solid var(--line)}
+.preview .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:12px;color:var(--muted);font-size:13px}
+.preview iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+@media(max-width:600px){.seg{display:flex;width:100%}.seg-btn{flex:1;min-width:0;padding:8px 12px}#busy-clock{font-size:32px}.h-box{padding:14px}}
+</style>
+</head>
+<body>
+<header><div class="head"><div class="logo">✂</div><div><h1>The Orthodox Muslim · Clip Maker</h1><div class="subhead">Turn your timestamp notes into ready-to-post clips</div></div><button id="open-history" class="btn header-btn" type="button">History<span class="count" id="hist-count"></span></button></div></header>
+<main>
+<section class="how" aria-label="How it works">
+  <div class="how-card"><div class="how-ico">✦</div><div><h3>Ask Gemini</h3><p>Give Gemini your YouTube link with the prompt below. It finds the iconic moments and explains why.</p></div></div>
+  <div class="how-card"><div class="how-ico">⧉</div><div><h3>Paste its answer here</h3><p>Copy Gemini's timestamps and reasons into this app. It recognizes every clip automatically.</p></div></div>
+  <div class="how-card"><div class="how-ico">✂</div><div><h3>Get your clips</h3><p>Upload the same video. Each clip is cut on your device, with a caption and hashtags ready to post.</p></div></div>
+</section>
+<section class="panel">
+  <h2 class="section-title"><span class="num">1</span>Get timestamps from Gemini</h2>
+  <p class="hint">Paste your YouTube link, copy the prompt, then paste it into <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a>. Chat or agent mode both work.</p>
+  <div class="opts" style="margin-top:12px">
+    <label>YouTube link<input id="yt" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"></label>
+    <label>Longest clip<select id="maxlen"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="3" selected>3 minutes</option></select></label>
+  </div>
+  <pre id="prompt-box" tabindex="0" aria-label="Prompt for Gemini"></pre>
+  <div class="clip-actions"><button id="copy-prompt" class="btn primary" type="button">Copy prompt</button><a class="btn" href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini</a></div>
+  <p class="hint">Gemini's timestamps can be a few seconds off. Skim your clips afterwards and adjust the notes if needed.</p>
+
+  <h2 class="section-title sep"><span class="num" id="n2">2</span>Upload the same video</h2>
+  <label id="drop" for="file">
+    <input id="file" type="file" accept="video/*" hidden>
+    <span id="drop-icon">＋</span>
+    <span id="file-name">Choose a video or drop it here</span>
+    <span id="file-meta">MP4, MOV, WebM and other browser-supported video files</span>
+  </label>
+  <div id="warn" class="warn" role="note" hidden></div>
+
+  <h2 class="section-title sep"><span class="num" id="n3">3</span>Paste Gemini's answer</h2>
+  <p class="hint" style="margin-bottom:10px">One clip per line: a time range, then the reason. Bold text, bullets and numbering from Gemini are fine. Your notes are saved in this browser.</p>
+  <div class="tools"><button id="paste" class="btn" type="button">Paste from clipboard</button><button id="clear" class="btn" type="button">Clear</button></div>
+  <textarea id="notes" spellcheck="false" aria-label="Timestamp notes" placeholder="00:12 - 00:48 | A powerful explanation of the main point.&#10;01:04 - 01:39 | A sharp response that makes the argument clear.&#10;02:10 - 02:52 | A quiz moment with a surprising answer."></textarea>
+  <div id="detected" aria-live="polite" hidden></div>
+  <div class="mode-row">
+    <div class="mode-label">Cutting mode</div>
+    <div class="seg" role="radiogroup" aria-label="Cutting mode">
+      <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-mode="fast"><b>Fast</b><small>Ready in seconds</small></button>
+      <button type="button" class="seg-btn" role="radio" aria-checked="false" data-mode="accurate"><b>Accurate</b><small>Slow, exact frame</small></button>
+    </div>
+    <input type="hidden" id="mode" value="fast">
+    <p class="hint" id="mode-hint"></p>
+  </div>
+  <button id="go" type="button">Create clips &amp; captions</button>
+  <p class="hint" style="text-align:center">Every clip includes 2 extra seconds before and after your timestamps, so nothing is cut too tight.</p>
+  <p id="privacy">AI reads your pasted notes. Your video stays in your browser and is cut on your device. Your history (link, notes and captions, never the video) is saved only in this browser.</p>
+</section>
+<div id="status" role="status" aria-live="polite"></div>
+<section id="results" hidden>
+  <div class="results-head"><div><h2 style="display:inline">Your clips</h2><span id="result-count"></span></div><div class="clip-actions" style="margin:0"><button id="vall" class="btn" type="button">Make all vertical…</button><button id="zip" class="btn" type="button">Download all (.zip)</button></div></div>
+  <div id="clip-list"></div>
+</section>
+</main>
+<div id="busy" role="alertdialog" aria-modal="true" aria-labelledby="busy-text" hidden><div class="busy-box"><div class="spinner"></div><div id="busy-text">Working...</div><div id="busy-clock" aria-hidden="true">0:00.0</div><div id="busy-lap"></div><div class="bar" id="bar" hidden><div id="bar-fill"></div></div><div id="busy-note" class="hint"></div><button id="cancel" class="btn" type="button">Cancel</button></div></div>
+<div id="editor" role="dialog" aria-modal="true" aria-labelledby="ed-title" hidden><div class="ed-box">
+  <div class="ed-top"><h3 id="ed-title">Frame clip</h3><button id="ed-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
+  <details class="ed-help"><summary>How to use</summary><p class="hint">Two boxes: <b>Top</b> becomes the top half of the vertical video and <b>Bottom</b> the bottom half. Drag inside a box to move it. Drag any <b>edge or corner dot</b> to change its width and height separately. Use the slider to check other moments; the small preview shows the exact result. <b>Fill</b> crops the box edges to fill its half, <b>Fit</b> shows the whole box with black bars. "Apply to all clips" uses these boxes for every clip.</p></details>
+  <div class="ed-body">
+    <div>
+      <div class="ed-stage" id="ed-stage"><canvas id="ed-canvas"></canvas></div>
+      <label class="ed-time">Pick a moment in this clip<input id="ed-time" type="range"></label>
+    </div>
+    <div class="ed-side">
+      <canvas id="ed-prev" width="180" height="320"></canvas>
+      <div class="ed-tools">
+        <div><p class="ed-cap">Editing box</p><div class="ed-seg" id="ed-sel" role="group" aria-label="Box to edit"><button type="button" data-sel="a" class="on">Top</button><button type="button" data-sel="b">Bottom</button></div></div>
+        <div><p class="ed-cap">Box shape in video</p><div class="ed-seg" id="ed-fit" role="group" aria-label="Fill or fit"><button type="button" data-fit="fill" class="on">Fill</button><button type="button" data-fit="fit">Fit</button></div></div>
+        <div class="ed-tool-row"><button id="ed-swap" class="btn" type="button">Swap</button><button id="ed-reset" class="btn" type="button">Reset</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="ed-foot"><button id="ed-all" class="btn" type="button">Apply to all clips</button><button id="ed-done" class="btn primary" type="button">Make this clip vertical</button></div>
+</div></div>
+<div id="history" role="dialog" aria-modal="true" aria-labelledby="h-title" hidden><div class="h-box">
+  <div class="h-top"><h3 id="h-title">History</h3><div class="clip-actions" style="margin:0"><button id="h-clear" class="btn del" type="button">Delete all</button><button id="h-close" class="btn" type="button">Close</button></div></div>
+  <p class="hint">Saved only in this browser: your YouTube link, pasted notes and captions. Videos are never stored. If a link was saved, Play shows that moment from the original YouTube video right here (it loads from youtube.com).</p>
+  <div id="h-list"></div>
+</div></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const state = { vw: 0, vh: 0, lastFrame: null, edVideo: null, file: null, fileUrl: null, duration: 0, busy: false, ffmpeg: null, input: null, outputs: [], laps: [], historyId: null, sessionUrl: "", sessionNotes: "", progressMessage: "", cancelled: false, abort: null, cancelPromise: null, rejectCancel: null };
+const CORE_BASES = [
+  "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm",
+  "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
+];
+const MOUNT = "/input";
+const AI_TIMEOUT_MS = 45000;
+const ENGINE_STALL_MS = 30000;
+const FAST_CUT_TIMEOUT_MS = 120000;
+const PAD = 2; // seconds added before and after every clip, to avoid cutting too tight
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform));
+const TIME = "\\d{1,3}:\\d{2}(?::\\d{2})?";
+const SEP = "\\s*(?:-->|->|→|-|–|—|to|until)\\s*";
+const RANGE_RE = new RegExp(`(${TIME})${SEP}(${TIME})`, "i");
+const MAX_BEFORE = 60;
+
+function formatTime(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`;
+}
+function parseTime(value) {
+  const parts = String(value).trim().split(":").map(Number);
+  if (parts.some(n => !Number.isInteger(n) || n < 0)) return NaN;
+  if (parts.length === 2 && parts[1] < 60) return parts[0] * 60 + parts[1];
+  if (parts.length === 3 && parts[1] < 60 && parts[2] < 60) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return NaN;
+}
+/* Reads Gemini-style text: one clip per line (a time range anywhere near the start), extra lines join the note. */
+function parseNotes(text) {
+  const clips = [];
+  let open = false; // extra lines only continue a note until the next blank line or heading
+  const clean = String(text).replace(/\*\*|__|`/g, "").replace(/\r/g, "");
+  for (const raw of clean.split("\n")) {
+    const line = raw.trim();
+    if (!line) { open = false; continue; }
+    const m = RANGE_RE.exec(line);
+    if (m && m.index <= MAX_BEFORE) {
+      const before = line.slice(0, m.index).replace(/^(?:[>#*•\-]+\s*|\d+[.)]\s+)+/, "").replace(/^[\[(\s]+/, "").replace(/[\s([{:|\-–—]+$/, "");
+      const after = line.slice(m.index + m[0].length).replace(/^[\s|:;,.\])}>\-–—]+/, "");
+      clips.push({ start: parseTime(m[1]), end: parseTime(m[2]), note: [before, after].filter(Boolean).join(": ") });
+      open = true;
+    } else if (/^#/.test(line)) { open = false;
+    } else if (clips.length && open) {
+      const last = clips[clips.length - 1];
+      last.note += (last.note ? " " : "") + line.replace(/^[-*•]\s+/, "");
+    }
+  }
+  clips.forEach((c, i) => {
+    if (!Number.isFinite(c.start) || !Number.isFinite(c.end) || c.end <= c.start) c.error = `Check the timestamp range for clip ${i + 1}.`;
+    else if (!c.note) c.error = `Add a short note explaining clip ${i + 1}.`;
+  });
+  return clips;
+}
+function validClips() {
+  const clips = parseNotes($("#notes").value);
+  if (!clips.length) throw new Error("Paste at least one timestamp range, such as 00:12 - 00:48 | your note.");
+  if (clips.length > 30) throw new Error("Please keep each batch to 30 clips or fewer.");
+  const bad = clips.find(c => c.error);
+  if (bad) throw new Error(bad.error);
+  return clips.map(({ start, end, note }) => ({ start, end, note }));
+}
+function findOverlaps(clips) {
+  const issues = [];
+  for (let i = 0; i < clips.length; i++) for (let j = i + 1; j < clips.length; j++) {
+    const a = clips[i], b = clips[j];
+    if (a.start < b.end && b.start < a.end) issues.push(`${i + 1} & ${j + 1}`);
+  }
+  return issues.length ? `Heads up: clips ${issues.slice(0, 4).join(", ")}${issues.length > 4 ? "…" : ""} overlap.` : "";
+}
+
+/* Gemini prompt + live preview of recognized clips */
+function buildPrompt() {
+  const link = $("#yt").value.trim() || "[PASTE YOUTUBE LINK HERE]";
+  const mins = $("#maxlen").value;
+  return `Watch this YouTube video: ${link}
+
+Find the most iconic, powerful and shareable moments in it that would work as standalone short clips.
+
+Rules:
+- Every clip must be ${mins} minute${mins === "1" ? "" : "s"} or shorter, and at least 15 seconds.
+- Start at the beginning of a sentence or thought and end at a natural stopping point, so the clip makes sense without extra context.
+- Use exact timestamps from the video in MM:SS format (H:MM:SS if the video is over an hour).
+- List clips in chronological order and do not let them overlap.
+- Pick only genuinely strong moments (usually 5 to 15).
+- For each clip, say in one or two sentences why it is iconic, mentioning what is actually said or happens. This is used to write the caption.
+
+Output only a plain list, one clip per line, in exactly this format. No bold, no numbering, no headings, no intro or closing text:
+00:12 - 00:48 | Why this moment is iconic
+01:04 - 02:39 | Why this moment is iconic`;
+}
+function renderPrompt() { $("#prompt-box").textContent = buildPrompt(); }
+function notesChanged() {
+  try { localStorage.setItem("clipper.notes", $("#notes").value); } catch {}
+  renderDetected();
+}
+function renderDetected() {
+  const box = $("#detected"), text = $("#notes").value;
+  const clips = parseNotes(text);
+  const ok = clips.length > 0 && !clips.some(c => c.error);
+  $("#n2").classList.toggle("done", !!state.file); $("#n2").textContent = state.file ? "✓" : "2";
+  $("#n3").classList.toggle("done", ok); $("#n3").textContent = ok ? "✓" : "3";
+  $("#go").textContent = ok ? `Create ${clips.length} clip${clips.length > 1 ? "s" : ""} & captions` : "Create clips & captions";
+  if (!text.trim()) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!clips.length) { box.innerHTML = `<div class="det-head bad">No timestamps recognized yet. Each clip needs a range like 00:12 - 00:48 near the start of its line.</div>`; return; }
+  const max = Number($("#maxlen").value) * 60;
+  const overlap = findOverlaps(clips);
+  const rows = clips.map(c => {
+    const flags = [];
+    if (c.error) flags.push(["bad", c.error]);
+    else {
+      if (c.end - c.start > max + 1) flags.push(["", `Longer than ${$("#maxlen").value} min`]);
+      if (state.duration && c.end > state.duration + 0.5) flags.push(["bad", "Ends after your video"]);
+    }
+    return `<li><div><span class="det-time">${Number.isFinite(c.start) ? formatTime(c.start) : "?"}–${Number.isFinite(c.end) ? formatTime(c.end) : "?"}</span><span class="det-len">${c.end > c.start ? formatTime(c.end - c.start) + " long" : ""}</span></div><div class="det-note">${escapeHTML(c.note) || "(no note)"}</div>${flags.map(([k, t]) => `<div class="det-flag ${k}">⚠ ${escapeHTML(t)}</div>`).join("")}</li>`;
+  }).join("");
+  box.innerHTML = `<div class="det-head ${ok ? "good" : "bad"}">${clips.length} clip${clips.length > 1 ? "s" : ""} recognized${overlap ? " · " + escapeHTML(overlap) : ""}</div><ul>${rows}</ul>`;
+}
+let clockTimer = null, clockStart = 0, stageName = "";
+function clockText(ms) { const t = Math.floor(ms / 100) / 10, m = Math.floor(t / 60); return `${m}:${(t % 60).toFixed(1).padStart(4, "0")}`; }
+function tickClock() {
+  const ms = Date.now() - clockStart;
+  $("#busy-clock").textContent = clockText(ms);
+  $("#busy-note").textContent = ms > 60000 ? "Still working. If nothing changes, press Cancel and try again." : "";
+}
+function showBusy(on, message = "Working...") {
+  if (on && !state.busy) { stageName = ""; clearInterval(clockTimer); clockTimer = setInterval(tickClock, 100); }
+  if (on && message !== stageName) { stageName = message; clockStart = Date.now(); tickClock(); } // the stopwatch restarts at every new step or clip
+  if (!on) { clearInterval(clockTimer); clockTimer = null; stageName = ""; $("#busy-clock").textContent = "0:00.0"; $("#busy-note").textContent = ""; $("#busy-lap").innerHTML = ""; }
+  state.busy = on;
+  $("#busy").hidden = !on;
+  $("#busy-text").textContent = message;
+  $("#go").disabled = on;
+  $("#bar").hidden = !(on && state.clipTotal);
+}
+function setBar(f) { $("#bar-fill").style.width = `${Math.round(Math.min(1, Math.max(0, f)) * 100)}%`; }
+let toastTimer;
+function toast(message, error = false) {
+  const el = $("#toast");
+  el.textContent = message;
+  el.className = error ? "error" : "";
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.hidden = true, error ? 6500 : 2800);
+}
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+function slug(text) {
+  return String(text || "clip").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,55) || "clip";
+}
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+const tagsText = tags => tags.map(tag => `#${String(tag).replace(/^#/, "")}`).join(" ");
+const shareText = item => `${item.caption}\n\n${item.tagsText}`;
+
+/* Keep the screen on while working, so phones do not suspend the tab. */
+let wake = null;
+async function keepAwake(on) {
+  try {
+    if (on && "wakeLock" in navigator) wake = await navigator.wakeLock.request("screen");
+    else if (!on && wake) { await wake.release(); wake = null; }
+  } catch {}
+}
+document.addEventListener("visibilitychange", () => { if (state.busy && document.visibilityState === "visible") keepAwake(true); });
+
+/* Store-only ZIP writer (MP4 is already compressed), so no library is needed. */
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(buf) { let crc = -1; for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buf[i]) & 255]; return (crc ^ -1) >>> 0; }
+async function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  const d = new Date();
+  const dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const dosDate = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), size = f.blob.size;
+    const crc = crc32(new Uint8Array(await f.blob.arrayBuffer()));
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, name.length, true);
+    parts.push(lh.buffer, name, f.blob);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, name.length, true); ch.setUint32(42, offset, true);
+    central.push(ch.buffer, name);
+    offset += 30 + name.length + size;
+    if (offset > 0xFFFFFF00) throw new Error("The clips are too large for one zip. Download them individually.");
+  }
+  const cdSize = central.reduce((n, p) => n + p.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.buffer], { type: "application/zip" });
+}
+async function downloadZip() {
+  if (!state.outputs.length) return;
+  const btn = $("#zip"); btn.disabled = true; btn.textContent = "Preparing zip...";
+  try {
+    const files = state.outputs.flatMap(o => [{ name: o.name, blob: o.blob }, ...(o.vBlob ? [{ name: o.vName, blob: o.vBlob }] : [])]);
+    const captions = state.outputs.map((o, i) => `Clip ${i + 1}: ${o.title}  (${formatTime(o.start)}-${formatTime(o.end)})\n${shareText(o)}`).join("\n\n---\n\n");
+    files.push({ name: "captions.txt", blob: new Blob([captions], { type: "text/plain" }) });
+    download(await makeZip(files), "orthodox-clips.zip");
+  } catch (error) { toast(error.message || "Could not build the zip.", true); }
+  finally { btn.disabled = false; btn.textContent = "Download all (.zip)"; }
+}
+
+async function copyText(text, okMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(okMessage);
+  } catch {
+    const box = document.createElement("textarea");
+    box.value = text; document.body.append(box); box.select();
+    const ok = document.execCommand("copy"); box.remove();
+    toast(ok ? okMessage : "Clipboard access was blocked.", !ok);
+  }
+}
+const copyCaption = item => copyText(shareText(item), "Caption and hashtags copied.");
+async function callAI(clips, signal) {
+  let response;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const limit = new AbortController();
+    const timer = setTimeout(() => limit.abort(), AI_TIMEOUT_MS);
+    const onAbort = () => limit.abort();
+    signal?.addEventListener("abort", onAbort);
+    try {
+    response = await fetch("/api/highlights", {
+      method: "POST", signal: limit.signal,
+      headers: { "Content-Type": "application/json", "x-app-password": localStorage.getItem("clipper.password") || "" },
+      body: JSON.stringify({ mode: "notes", clips, durationSeconds: state.duration })
+    });
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      throw new Error(`The AI service did not respond within ${AI_TIMEOUT_MS / 1000} seconds.`);
+    } finally { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); }
+    if (response.status === 401 && attempt === 0) {
+      const password = prompt("Enter the app password:");
+      if (!password) throw new Error("Password required.");
+      localStorage.setItem("clipper.password", password);
+      continue;
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) localStorage.removeItem("clipper.password");
+      throw new Error(data.error || `AI request failed (HTTP ${response.status}).`);
+    }
+    return data;
+  }
+  throw new Error("Unable to reach the AI service.");
+}
+
+async function getFFmpeg() {
+  if (state.ffmpeg) return state.ffmpeg;
+  let FFmpeg, toBlobURL;
+  try {
+    ({ FFmpeg } = await import("/vendor/ffmpeg/index.js"));
+    ({ toBlobURL } = await import("/vendor/util/index.js"));
+  } catch {
+    throw new Error("The video engine is missing. Deploy the full project after running its build step.");
+  }
+  let lastError;
+  for (const base of CORE_BASES) {
+    const ff = new FFmpeg();
+    ff.on("log", ({ message }) => window.CLIPPER_DEBUG && console.log(message));
+    let watchdog;
+    try {
+      showBusy(true, "Downloading the video engine (first time only)...");
+      let lastBytes = Date.now();
+      const stalled = new Promise((_, reject) => {
+        watchdog = setInterval(() => { if (Date.now() - lastBytes > ENGINE_STALL_MS) reject(new Error("Engine download stalled.")); }, 3000);
+      });
+      stalled.catch(() => {});
+      const onProgress = ({ received, total }) => {
+        lastBytes = Date.now();
+        const mb = n => (n / 1048576).toFixed(1);
+        $("#busy-text").textContent = total > 0 && received <= total
+          ? `Downloading the video engine (first time only)... ${mb(received)} of ${mb(total)} MB`
+          : `Downloading the video engine (first time only)... ${mb(received)} MB`;
+      };
+      const coreURL = await Promise.race([toBlobURL(`${base}/ffmpeg-core.js`, "text/javascript"), stalled]);
+      const wasmURL = await Promise.race([toBlobURL(`${base}/ffmpeg-core.wasm`, "application/wasm", true, onProgress), stalled]);
+      clearInterval(watchdog);
+      $("#busy-text").textContent = "Starting the video engine...";
+      await ff.load({ coreURL, wasmURL });
+      state.ffmpeg = ff;
+      return ff;
+    } catch (error) { lastError = error; clearInterval(watchdog); try { ff.terminate(); } catch {} }
+  }
+  console.error(lastError);
+  throw new Error("Could not download the video engine. Check your connection and try again.");
+}
+/* Mount the file read-only instead of copying it into memory (falls back to a copy if unsupported). */
+async function mountInput(ff) {
+  await unmountInput(ff);
+  const ext = state.file.name.match(/\.[a-z0-9]{1,5}$/i)?.[0]?.toLowerCase() || ".mp4";
+  const safe = new File([state.file], `source${ext}`, { type: state.file.type });
+  try {
+    await ff.createDir(MOUNT);
+    await ff.mount("WORKERFS", { files: [safe] }, MOUNT);
+    state.input = { type: "mount", path: `${MOUNT}/${safe.name}` };
+  } catch {
+    try { await ff.deleteDir(MOUNT); } catch {}
+    await ff.writeFile(safe.name, new Uint8Array(await safe.arrayBuffer()));
+    state.input = { type: "file", path: safe.name };
+  }
+  return state.input.path;
+}
+async function unmountInput(ff) {
+  const input = state.input;
+  state.input = null;
+  if (!input || !ff) return;
+  try {
+    if (input.type === "mount") { await ff.unmount(MOUNT); await ff.deleteDir(MOUNT); }
+    else await ff.deleteFile(input.path);
+  } catch {}
+}
+
+function capBlockHTML(caption, tagsText, src) {
+  return `<div class="cap-block" data-src="${src}">
+      <div class="caption-label">Caption and hashtags <span style="font-weight:400">(tap to edit)</span></div>
+      <div class="cap-view" tabindex="0" role="button" aria-expanded="false"><p class="cap-text">${escapeHTML(caption) || "(no caption)"}</p><p class="cap-tags">${escapeHTML(tagsText)}</p></div>
+      <div class="cap-tools" hidden><button class="btn" type="button" data-act="edit">✎ Edit caption</button></div>
+      <div class="cap-editor" hidden>
+        <textarea class="caption-edit" aria-label="Caption">${escapeHTML(caption)}</textarea>
+        <input class="tags-edit" aria-label="Hashtags" value="${escapeHTML(tagsText)}" autocapitalize="off" autocomplete="off">
+        <div class="clip-actions"><button class="btn primary" type="button" data-act="save">Save</button><button class="btn" type="button" data-act="cancel">Cancel</button></div>
+      </div>
+    </div>`;
+}
+function refreshCapView(block, caption, tagsText) {
+  if (!block) return;
+  block.querySelector(".cap-text").textContent = caption || "(no caption)";
+  block.querySelector(".cap-tags").textContent = tagsText;
+  block.querySelector(".caption-edit").value = caption;
+  block.querySelector(".tags-edit").value = tagsText;
+}
+function getCap(src) {
+  const [kind, a, b] = src.split(":");
+  if (kind === "out") { const o = state.outputs[Number(a)]; return o && { caption: o.caption, tagsText: o.tagsText }; }
+  const c = loadHistory().find(x => x.id === a)?.clips?.[Number(b)];
+  return c && { caption: c.caption, tagsText: c.tagsText };
+}
+function setCap(src, caption, tagsText) {
+  const [kind, a, b] = src.split(":");
+  if (kind === "out") {
+    const o = state.outputs[Number(a)]; if (!o) return;
+    o.caption = caption; o.tagsText = tagsText; syncHistory();
+    return;
+  }
+  const list = loadHistory(), c = list.find(x => x.id === a)?.clips?.[Number(b)];
+  if (!c) return;
+  c.caption = caption; c.tagsText = tagsText; saveHistory(list);
+  const live = state.historyId === a && state.outputs[Number(b)];
+  if (live) { live.caption = caption; live.tagsText = tagsText; refreshCapView(document.querySelector(`#clip-list .cap-block[data-src="out:${b}"]`), caption, tagsText); }
+}
+function onCaptionClick(e) {
+  const block = e.target.closest(".cap-block"); if (!block) return;
+  const view = block.querySelector(".cap-view"), tools = block.querySelector(".cap-tools"), editor = block.querySelector(".cap-editor");
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "edit") { view.hidden = true; tools.hidden = true; editor.hidden = false; block.querySelector(".caption-edit").focus(); }
+  else if (act === "save") {
+    const caption = block.querySelector(".caption-edit").value.trim(), tags = block.querySelector(".tags-edit").value.trim();
+    setCap(block.dataset.src, caption, tags); refreshCapView(block, caption, tags);
+    editor.hidden = true; view.hidden = false; view.setAttribute("aria-expanded", "false"); toast("Caption saved.");
+  } else if (act === "cancel") {
+    const cur = getCap(block.dataset.src); if (cur) refreshCapView(block, cur.caption, cur.tagsText);
+    editor.hidden = true; view.hidden = false;
+  } else if (e.target.closest(".cap-view")) { tools.hidden = !tools.hidden; view.setAttribute("aria-expanded", String(!tools.hidden)); }
+}
+document.addEventListener("click", onCaptionClick);
+document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("cap-view")) { e.preventDefault(); onCaptionClick(e); } });
+
+function cardHTML(item, i) {
+  return `<article class="clip" data-i="${i}">
+      <div class="clip-head"><div class="clip-title">${escapeHTML(item.title || `Clip ${i + 1}`)}</div><div class="clip-time">${formatTime(item.start)}–${formatTime(item.end)} (±${PAD}s)</div></div>
+      <video controls playsinline preload="metadata" src="${item.url}"></video>
+      <div class="cut-time">Cut in ${item.cutSeconds.toFixed(1)} s</div>
+      ${capBlockHTML(item.caption, item.tagsText, `out:${i}`)}
+      <div class="clip-actions">
+        <button class="btn primary" data-copy="${i}" type="button">Copy caption + hashtags</button>
+        <a class="btn" href="${item.url}" download="${escapeHTML(item.name)}">Download MP4</a>
+        <button class="btn" data-regen="${i}" type="button">Rewrite caption</button>
+        <button class="btn" data-vert="${i}" type="button">Make vertical (optional)</button>
+      </div>
+      <div class="vbox" id="vbox-${i}" hidden></div>
+    </article>`;
+}
+function updateResultsHeader() {
+  $("#results").hidden = !state.outputs.length;
+  $("#result-count").textContent = `${state.outputs.length} ready`;
+}
+function resetOutputs() {
+  state.outputs.forEach(item => { URL.revokeObjectURL(item.url); if (item.vUrl) URL.revokeObjectURL(item.vUrl); });
+  state.outputs = []; state.historyId = null;
+  $("#clip-list").innerHTML = "";
+  updateResultsHeader();
+}
+async function makeClips(highlights, clips) {
+  const ff = await Promise.race([getFFmpeg(), state.cancelPromise]);
+  showBusy(true, "Opening your video...");
+  const input = await Promise.race([mountInput(ff), state.cancelPromise]);
+  resetOutputs();
+  state.sessionUrl = $("#yt").value.trim(); state.sessionNotes = $("#notes").value;
+  const fast = $("#mode").value === "fast";
+  state.clipTotal = highlights.length; state.laps = [];
+  for (let i = 0; i < highlights.length; i++) {
+    const h = highlights[i];
+    state.progressMessage = `Cutting clip ${i + 1} of ${highlights.length}...`;
+    setBar(i / highlights.length);
+    showBusy(true, state.progressMessage); // restarts the stopwatch for this clip
+    const began = performance.now();
+    const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
+    const cutStart = Math.max(0, h.start - PAD);
+    const cutEnd = Math.min(state.duration || Infinity, h.end + PAD);
+    const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
+    if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
+    else {
+      args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
+    }
+    const code = await Promise.race([ff.exec(args, fast ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
+    if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. This phone may be too slow or low on memory for this video. Try a shorter or smaller H.264 MP4.`);
+    if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
+    const bytes = await ff.readFile(output);
+    try { await ff.deleteFile(output); } catch {}
+    const cutSeconds = (performance.now() - began) / 1000;
+    state.laps.push(`Clip ${i + 1} cut in ${cutSeconds.toFixed(1)} s`);
+    $("#busy-lap").innerHTML = state.laps.slice(-4).map(t => `<div>${escapeHTML(t)}</div>`).join("");
+    const title = h.title || `Clip ${i + 1}`;
+    const blob = new Blob([bytes], { type: "video/mp4" });
+    const item = { ...h, note: clips[i].note, title, blob, cutSeconds, tagsText: tagsText(h.tags), name: `${String(i + 1).padStart(2,"0")}-${slug(title)}.mp4`, url: URL.createObjectURL(blob) };
+    state.outputs.push(item);
+    $("#clip-list").insertAdjacentHTML("beforeend", cardHTML(item, state.outputs.length - 1));
+    updateResultsHeader();
+  }
+  setBar(1);
+  state.progressMessage = "";
+}
+async function run() {
+  if (state.busy) return;
+  state.cancelled = false;
+  state.abort = new AbortController();
+  state.cancelPromise = new Promise((_, reject) => { state.rejectCancel = () => reject(new Error("Cancelled")); });
+  state.cancelPromise.catch(() => {});
+  try {
+    if (!state.file) throw new Error("Upload a video first.");
+    if (state.metaState === "loading") throw new Error("The video is still being read. Wait a few seconds and try again.");
+    const clips = validClips();
+    const invalid = state.duration ? clips.find(clip => clip.end > state.duration + 0.5) : null;
+    if (invalid) throw new Error(`Clip ${formatTime(invalid.start)}–${formatTime(invalid.end)} ends after the uploaded video.`);
+    const overlap = findOverlaps(clips);
+    showBusy(true, "AI is reading your notes and writing captions...");
+    await keepAwake(true);
+    let result, aiProblem = "";
+    try { result = await callAI(clips, state.abort.signal); }
+    catch (error) {
+      if (state.cancelled) throw error;
+      console.error(error);
+      aiProblem = error.message || String(error);
+      result = { highlights: clips.map((clip, i) => ({ title: `Clip ${i + 1}`, start: clip.start, end: clip.end, caption: clip.note, tags: ["TheOrthodoxMuslim"] })) };
+      toast("AI captions unavailable. Cutting the clips anyway.", true);
+    }
+    if (!result.highlights?.length) throw new Error("The AI did not return any clips. Check the timestamp notes and try again.");
+    $("#status").textContent = `${result.highlights.length} timestamp ranges processed. Cutting your clips now...`;
+    await makeClips(result.highlights, clips);
+    $("#status").textContent = `Finished. ${state.outputs.length} clips are ready.${aiProblem ? " Captions are your own notes because the AI step failed (" + aiProblem + "). Use Rewrite caption to retry." : ""}${overlap ? " " + overlap : ""}`;
+    $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
+    toast("Your clips are ready.");
+  } catch (error) {
+    if (state.cancelled) {
+      $("#status").textContent = state.outputs.length ? "Cancelled. Clips finished so far are below." : "Cancelled.";
+      toast("Cancelled.");
+    } else {
+      console.error(error);
+      toast(error.message || String(error), true);
+      $("#status").textContent = "Something needs attention. Check the message above.";
+    }
+  } finally {
+    state.progressMessage = ""; state.clipTotal = 0; setBar(0);
+    try { syncHistory(); } catch (error) { console.error(error); }
+    await keepAwake(false);
+    await unmountInput(state.ffmpeg);
+    showBusy(false);
+  }
+}
+function cancel() {
+  state.cancelled = true;
+  state.abort?.abort();
+  state.rejectCancel?.();
+  if (state.ffmpeg) { try { state.ffmpeg.terminate(); } catch {} state.ffmpeg = null; state.input = null; }
+}
+async function regenerate(i, button) {
+  const item = state.outputs[i];
+  if (!item || state.busy) return;
+  button.disabled = true; button.textContent = "Rewriting...";
+  try {
+    const result = await callAI([{ start: item.start, end: item.end, note: item.note }]);
+    const h = result.highlights?.[0];
+    if (!h) throw new Error("The AI did not return a caption.");
+    item.caption = h.caption; item.tagsText = tagsText(h.tags);
+    const card = document.querySelector(`.clip[data-i="${i}"]`);
+    refreshCapView(card.querySelector(".cap-block"), item.caption, item.tagsText);
+    syncHistory();
+    toast("New caption ready.");
+  } catch (error) { toast(error.message || "Could not rewrite the caption.", true); }
+  finally { button.disabled = false; button.textContent = "Rewrite caption"; }
+}
+
+function updateWarnings(file) {
+  const mb = file.size / 1048576, notes = [];
+  if (IS_MOBILE && mb > 300) notes.push("This is a large video for a phone. The browser may run out of memory. Fast mode helps, or use a computer for long videos.");
+  else if (mb > 2000) notes.push("This video is over 2 GB. Browsers often fail on files this large. Consider trimming it first or using Fast mode.");
+  if (/\.(mov|m4v)$/i.test(file.name) && IS_MOBILE) notes.push("If cutting fails, the video may be HEVC (H.265). Export it as H.264 MP4.");
+  $("#warn").textContent = notes.join(" ");
+  $("#warn").hidden = !notes.length;
+}
+function updateModeHint() {
+  $("#mode-hint").textContent = $("#mode").value === "fast"
+    ? "Fast mode copies the video without re-encoding, so each clip is ready in seconds and uses little memory. A clip may begin up to a few seconds early (at the nearest keyframe), which the 2-second padding usually hides."
+    : "Accurate mode cuts at the exact frame but re-encodes every clip inside your browser. Expect several times the clip length (a 1-minute clip can take 1 to 3 minutes on a computer, much longer on a phone). Use it only if Fast starts a clip too early.";
+}
+function selectFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith("video/") && !/\.(mp4|mov|m4v|webm|mkv|avi|mpeg|mpg|3gp)$/i.test(file.name)) return toast("Choose a video file.", true);
+  if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
+  unmountInput(state.ffmpeg);
+  resetOutputs();
+  $("#status").textContent = "";
+  state.file = file;
+  state.duration = 0; state.metaState = "loading";
+  state.vw = state.vh = 0; state.lastFrame = null;
+  state.fileUrl = URL.createObjectURL(file);
+  $("#file-name").textContent = file.name;
+  $("#file-meta").textContent = `${(file.size / 1048576).toFixed(1)} MB · Reading duration...`;
+  updateWarnings(file);
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  const size = `${(file.size / 1048576).toFixed(1)} MB`;
+  const known = () => Number.isFinite(video.duration) && video.duration > 0;
+  const finish = () => {
+    if (state.file !== file || state.metaState !== "loading") return;
+    state.vw = video.videoWidth; state.vh = video.videoHeight;
+    if (known()) { state.duration = video.duration; state.metaState = "ready"; $("#file-meta").textContent = `${size} · ${formatTime(state.duration)} long`; }
+    else { state.duration = 0; state.metaState = "unknown"; $("#file-meta").textContent = `${size} · length unknown (this file has no length info). Cutting still works, but clips past the end cannot be checked.`; }
+    renderDetected();
+  };
+  video.onloadedmetadata = () => {
+    if (known()) return finish();
+    // Some files (screen recordings, live captures) store no length. Seeking far ahead makes the browser work it out.
+    const timer = setTimeout(finish, 6000);
+    video.ondurationchange = () => { if (known()) { clearTimeout(timer); finish(); } };
+    try { video.currentTime = 1e101; } catch { clearTimeout(timer); finish(); }
+  };
+  video.onerror = () => { if (state.metaState === "loading") { state.metaState = "failed"; $("#file-meta").textContent = "Could not read this video in the browser. Cutting may still work; if it fails, try an MP4 (H.264)."; } };
+  video.src = state.fileUrl;
+  renderDetected();
+}
+
+/* ---------- Optional step after cutting: vertical split-screen ---------- */
+const ASPECT = 9 / 8; // each half of the output is 9:8, so two stacked halves make a 9:16 video
+const clone = o => JSON.parse(JSON.stringify(o));
+/* A box is { x, y, w, h } as fractions of the video size; frame = { a: top, b: bottom, fit: bool }. Width and height are independent. */
+function defaultFrame() {
+  const { vw, vh } = state;
+  const w = Math.min(vw / 2, vh * ASPECT), h = w / ASPECT;
+  const y = (vh - h) / 2, xa = (vw / 2 - w) / 2, xb = vw / 2 + xa;
+  return { a: { x: xa / vw, y: y / vh, w: w / vw, h: h / vh }, b: { x: xb / vw, y: y / vh, w: w / vw, h: h / vh }, fit: false };
+}
+function verticalFilter(fr) {
+  const { vw, vh } = state, W = IS_MOBILE ? 720 : 1080, H = W * 8 / 9;
+  const evenSize = n => Math.max(2, Math.floor(n / 2) * 2), evenPos = n => Math.max(0, Math.floor(n / 2) * 2);
+  const box = r => {
+    const w = Math.min(evenSize(r.w * vw), evenSize(vw)), h = Math.min(evenSize(r.h * vh), evenSize(vh));
+    const x = evenPos(Math.min(r.x * vw, vw - w)), y = evenPos(Math.min(r.y * vh, vh - h));
+    const fitStep = fr.fit
+      ? `scale=${W}:${H}:force_original_aspect_ratio=decrease:flags=bicubic,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:black`
+      : `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=bicubic,crop=${W}:${H}`;
+    return `crop=${w}:${h}:${x}:${y},${fitStep},setsar=1`;
+  };
+  return `[0:v]split=2[a][b];[a]${box(fr.a)}[t];[b]${box(fr.b)}[u];[t][u]vstack=inputs=2[v]`;
+}
+/* Runs a cancellable background task behind the busy overlay. */
+async function runTask(fn, message) {
+  if (state.busy) return;
+  state.cancelled = false;
+  state.abort = new AbortController();
+  state.cancelPromise = new Promise((_, reject) => { state.rejectCancel = () => reject(new Error("Cancelled")); });
+  state.cancelPromise.catch(() => {});
+  showBusy(true, message);
+  await keepAwake(true);
+  try { await fn(); toast("Vertical clips ready."); }
+  catch (error) {
+    if (state.cancelled) toast("Cancelled.");
+    else { console.error(error); toast(error.message || String(error), true); }
+  } finally {
+    state.progressMessage = ""; state.clipTotal = 0; setBar(0);
+    await keepAwake(false);
+    showBusy(false);
+  }
+}
+async function makeVertical(ff, i, frame) {
+  const item = state.outputs[i], tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
+  await ff.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
+  const code = await Promise.race([ff.exec([
+    "-i", tmpIn, "-filter_complex", verticalFilter(frame), "-map", "[v]", "-map", "0:a?",
+    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut
+  ]), state.cancelPromise]);
+  if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);
+  const bytes = await ff.readFile(tmpOut);
+  try { await ff.deleteFile(tmpIn); await ff.deleteFile(tmpOut); } catch {}
+  if (item.vUrl) URL.revokeObjectURL(item.vUrl);
+  item.vBlob = new Blob([bytes], { type: "video/mp4" });
+  item.vUrl = URL.createObjectURL(item.vBlob);
+  item.vName = item.name.replace(/\.mp4$/, "") + "-vertical.mp4";
+  const box = $(`#vbox-${i}`);
+  box.hidden = false;
+  box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a></div>`;
+  const btn = document.querySelector(`button[data-vert="${i}"]`);
+  if (btn) btn.textContent = "Redo vertical";
+}
+async function makeVerticalBatch(indices, frame) {
+  state.lastFrame = clone(frame);
+  state.clipTotal = indices.length;
+  const ff = await getFFmpeg();
+  for (let n = 0; n < indices.length; n++) {
+    state.clipIndex = n;
+    state.progressMessage = `Making clip ${indices[n] + 1} vertical (${n + 1} of ${indices.length})...`;
+    showBusy(true, state.progressMessage); setBar(n / indices.length);
+    await makeVertical(ff, indices[n], frame);
+  }
+}
+
+const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
+const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: "a" };
+function edSeek(t) {
+  return new Promise(resolve => {
+    const v = state.edVideo;
+    if (Math.abs(v.currentTime - t) < 0.01 && v.readyState >= 2) return resolve();
+    const done = () => { v.removeEventListener("seeked", done); clearTimeout(timer); resolve(); };
+    const timer = setTimeout(done, 3000);
+    v.addEventListener("seeked", done);
+    v.currentTime = Math.min(Math.max(0, t), v.duration || t);
+  });
+}
+function edSyncUI() {
+  document.querySelectorAll("#ed-sel button").forEach(b => b.classList.toggle("on", b.dataset.sel === ed.sel));
+  document.querySelectorAll("#ed-fit button").forEach(b => b.classList.toggle("on", (b.dataset.fit === "fit") === !!ed.frame.fit));
+}
+function edFitStage() {
+  // keep the video frame from getting taller than about half the screen, so the controls stay reachable on phones
+  $("#ed-stage").style.maxWidth = `calc(52vh * ${state.vw / state.vh})`;
+  if (window.CSS && CSS.supports("height", "1dvh")) $("#ed-stage").style.maxWidth = `calc(52dvh * ${state.vw / state.vh})`;
+}
+async function openEditor(i) {
+  const item = state.outputs[i];
+  if (!item || state.busy) return;
+  const v = state.edVideo = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.url });
+  try {
+    await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
+    state.vw = v.videoWidth; state.vh = v.videoHeight;
+    ed.index = i; ed.sel = "a"; ed.frame = clone(state.lastFrame || defaultFrame());
+    const slider = $("#ed-time");
+    slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
+    $("#ed-title").textContent = `Make vertical: ${item.title}`;
+    const cv = $("#ed-canvas");
+    cv.width = Math.min(960, state.vw); cv.height = Math.round(cv.width * state.vh / state.vw);
+    ed.scale = cv.width / state.vw;
+    edFitStage(); edSyncUI();
+    $("#editor").hidden = false;
+    $("#editor").scrollTop = 0;
+    document.body.style.overflow = "hidden";
+    await edSeek(Number(slider.value)); drawEditor();
+  } catch { toast("This clip can't be previewed in your browser, so vertical framing isn't available for it.", true); }
+}
+const closeEditor = () => { $("#editor").hidden = true; ed.drag = null; document.body.style.overflow = ""; };
+const rectPx = r => ({ x: r.x * state.vw, y: r.y * state.vh, w: r.w * state.vw, h: r.h * state.vh });
+/* The part of the source box that lands in one half of the output, and where it lands (shared by the live preview and the real render). */
+function mapBox(r, dw, dh, fit) {
+  const ba = r.w / r.h, da = dw / dh;
+  if (!fit) {
+    if (ba > da) { const sw = r.h * da; return { sx: r.x + (r.w - sw) / 2, sy: r.y, sw, sh: r.h, dx: 0, dy: 0, dw, dh }; }
+    const sh = r.w / da; return { sx: r.x, sy: r.y + (r.h - sh) / 2, sw: r.w, sh, dx: 0, dy: 0, dw, dh };
+  }
+  if (ba > da) { const h = dw / ba; return { sx: r.x, sy: r.y, sw: r.w, sh: r.h, dx: 0, dy: (dh - h) / 2, dw, dh: h }; }
+  const w = dh * ba; return { sx: r.x, sy: r.y, sw: r.w, sh: r.h, dx: (dw - w) / 2, dy: 0, dw: w, dh };
+}
+const HANDLES = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+function drawEditor() {
+  const v = state.edVideo, cv = $("#ed-canvas"), ctx = cv.getContext("2d"), s = ed.scale;
+  ed.k = cv.getBoundingClientRect().width / cv.width || 1;
+  const u = 1 / ed.k; // 1 screen pixel, in canvas pixels
+  const A = rectPx(ed.frame.a), B = rectPx(ed.frame.b);
+  ctx.drawImage(v, 0, 0, cv.width, cv.height);
+  ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(0, 0, cv.width, cv.height);
+  for (const r of [A, B]) ctx.drawImage(v, r.x, r.y, r.w, r.h, r.x * s, r.y * s, r.w * s, r.h * s);
+  const items = [["a", A, "#8b79ff", "Top"], ["b", B, "#42c98b", "Bottom"]];
+  items.sort((p, q) => (p[0] === ed.sel) - (q[0] === ed.sel)); // active box drawn last, on top
+  items.forEach(([key, r, color, label]) => {
+    const on = key === ed.sel, x = r.x * s, y = r.y * s, w = r.w * s, h = r.h * s;
+    ctx.lineWidth = (on ? 3 : 2) * u; ctx.strokeStyle = color; ctx.setLineDash(on ? [] : [6 * u, 4 * u]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+    ctx.font = `bold ${13 * u}px system-ui, sans-serif`;
+    const text = `${label} ${Math.round(r.w)}×${Math.round(r.h)}`, tw = ctx.measureText(text).width + 12 * u, th = 20 * u;
+    ctx.fillStyle = color; ctx.fillRect(x, y, Math.min(tw, w), th);
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, th); ctx.clip(); ctx.fillStyle = "#0b0c10"; ctx.fillText(text, x + 6 * u, y + 14.5 * u); ctx.restore();
+    if (!on) return;
+    for (const [hx, hy] of HANDLES) {
+      const rad = (hx && hy ? 9 : 7) * u, cx = clamp(x + (hx + 1) * w / 2, rad + u, cv.width - rad - u), cy = clamp(y + (hy + 1) * h / 2, rad + u, cv.height - rad - u); // kept inside the canvas so edge handles stay visible
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.fillStyle = color; ctx.fill();
+      ctx.lineWidth = 2 * u; ctx.strokeStyle = "#fff"; ctx.stroke();
+    }
+  });
+  const P = $("#ed-prev"), p = P.getContext("2d"), half = P.height / 2;
+  p.fillStyle = "#000"; p.fillRect(0, 0, P.width, P.height);
+  [[A, 0], [B, half]].forEach(([r, dy]) => {
+    const m = mapBox(r, P.width, half, ed.frame.fit);
+    p.drawImage(v, m.sx, m.sy, m.sw, m.sh, m.dx, dy + m.dy, m.dw, m.dh);
+  });
+  p.strokeStyle = "rgba(255,255,255,.25)"; p.beginPath(); p.moveTo(0, half); p.lineTo(P.width, half); p.stroke();
+}
+function edPos(e) {
+  const cv = $("#ed-canvas"), b = cv.getBoundingClientRect();
+  ed.k = b.width / cv.width;
+  return { x: (e.clientX - b.left) / ed.k / ed.scale, y: (e.clientY - b.top) / ed.k / ed.scale };
+}
+function edHit(p) {
+  const r0 = 26 / (ed.k * ed.scale); // touch radius in source pixels
+  const order = [ed.sel, ed.sel === "a" ? "b" : "a"];
+  // 1) handles and edges of the active box
+  const a = rectPx(ed.frame[ed.sel]);
+  let best = null;
+  for (const [hx, hy] of HANDLES) {
+    const m = 12 / (ed.k * ed.scale), cx = clamp(a.x + (hx + 1) * a.w / 2, m, state.vw - m), cy = clamp(a.y + (hy + 1) * a.h / 2, m, state.vh - m), d = Math.hypot(p.x - cx, p.y - cy);
+    if (d <= r0 && (!best || d < best.d)) best = { d, hx, hy };
+  }
+  if (!best) {
+    const t = r0 * 0.55, inX = p.x >= a.x - t && p.x <= a.x + a.w + t, inY = p.y >= a.y - t && p.y <= a.y + a.h + t;
+    if (inY && Math.abs(p.x - a.x) <= t) best = { hx: -1, hy: 0 };
+    else if (inY && Math.abs(p.x - (a.x + a.w)) <= t) best = { hx: 1, hy: 0 };
+    else if (inX && Math.abs(p.y - a.y) <= t) best = { hx: 0, hy: -1 };
+    else if (inX && Math.abs(p.y - (a.y + a.h)) <= t) best = { hx: 0, hy: 1 };
+  }
+  if (best) {
+    const ex = best.hx < 0 ? a.x : best.hx > 0 ? a.x + a.w : 0, ey = best.hy < 0 ? a.y : best.hy > 0 ? a.y + a.h : 0;
+    return { which: ed.sel, mode: "resize", hx: best.hx, hy: best.hy, ox: best.hx ? p.x - ex : 0, oy: best.hy ? p.y - ey : 0 };
+  }
+  // 2) body of either box (active one first)
+  for (const which of order) { const r = rectPx(ed.frame[which]); if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return { which, mode: "move", dx: p.x - r.x, dy: p.y - r.y }; }
+  return null;
+}
+const edCanvas = $("#ed-canvas");
+edCanvas.addEventListener("pointerdown", e => {
+  const hit = edHit(edPos(e)); if (!hit) return;
+  if (hit.which !== ed.sel) { ed.sel = hit.which; edSyncUI(); }
+  ed.drag = hit; edCanvas.setPointerCapture(e.pointerId); e.preventDefault(); drawEditor();
+});
+edCanvas.addEventListener("pointermove", e => {
+  if (!ed.drag) return;
+  const p = edPos(e), f = ed.frame[ed.drag.which], { vw, vh } = state, d = ed.drag;
+  const r = rectPx(f);
+  if (d.mode === "move") {
+    f.x = clamp((p.x - d.dx) / vw, 0, 1 - f.w);
+    f.y = clamp((p.y - d.dy) / vh, 0, 1 - f.h);
+  } else {
+    const mw = Math.min(vw, Math.max(48, vw * 0.06)), mh = Math.min(vh, Math.max(48, vh * 0.06));
+    let L = r.x, T = r.y, R = r.x + r.w, Bt = r.y + r.h;
+    if (d.hx < 0) L = clamp(p.x - d.ox, 0, R - mw); else if (d.hx > 0) R = clamp(p.x - d.ox, L + mw, vw);
+    if (d.hy < 0) T = clamp(p.y - d.oy, 0, Bt - mh); else if (d.hy > 0) Bt = clamp(p.y - d.oy, T + mh, vh);
+    f.x = L / vw; f.y = T / vh; f.w = (R - L) / vw; f.h = (Bt - T) / vh;
+  }
+  drawEditor();
+});
+["pointerup", "pointercancel"].forEach(t => edCanvas.addEventListener(t, () => { ed.drag = null; }));
+$("#ed-time").addEventListener("input", async e => { await edSeek(Number(e.target.value)); drawEditor(); });
+$("#ed-sel").addEventListener("click", e => { const b = e.target.closest("button[data-sel]"); if (!b) return; ed.sel = b.dataset.sel; edSyncUI(); drawEditor(); });
+$("#ed-fit").addEventListener("click", e => { const b = e.target.closest("button[data-fit]"); if (!b) return; ed.frame.fit = b.dataset.fit === "fit"; edSyncUI(); drawEditor(); });
+$("#ed-swap").addEventListener("click", () => { [ed.frame.a, ed.frame.b] = [ed.frame.b, ed.frame.a]; drawEditor(); });
+$("#ed-reset").addEventListener("click", () => { ed.frame = defaultFrame(); edSyncUI(); drawEditor(); });
+$("#ed-cancel").addEventListener("click", closeEditor);
+$("#ed-done").addEventListener("click", () => { const frame = clone(ed.frame), i = ed.index; closeEditor(); runTask(() => makeVerticalBatch([i], frame), "Preparing..."); });
+$("#ed-all").addEventListener("click", () => { const frame = clone(ed.frame); closeEditor(); runTask(() => makeVerticalBatch(state.outputs.map((_, i) => i), frame), "Preparing..."); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#editor").hidden) closeEditor(); });
+window.addEventListener("resize", () => { if (!$("#editor").hidden && state.edVideo) drawEditor(); });
+window.addEventListener("orientationchange", () => setTimeout(() => { if (!$("#editor").hidden && state.edVideo) drawEditor(); }, 250));
+
+/* Wire up */
+try { $("#notes").value = localStorage.getItem("clipper.notes") || ""; } catch {}
+$("#notes").addEventListener("input", notesChanged);
+$("#maxlen").addEventListener("change", () => { renderPrompt(); renderDetected(); });
+$("#yt").addEventListener("input", renderPrompt);
+$("#copy-prompt").addEventListener("click", () => copyText(buildPrompt(), $("#yt").value.trim() ? "Prompt copied. Paste it into Gemini." : "Prompt copied. Replace [PASTE YOUTUBE LINK HERE] with your link."));
+$("#paste").addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) return toast("The clipboard is empty.", true);
+    $("#notes").value = text; notesChanged(); toast("Pasted.");
+  } catch { toast("Clipboard access was blocked. Long-press the box and choose Paste.", true); }
+});
+$("#clear").addEventListener("click", () => { $("#notes").value = ""; notesChanged(); });
+function setMode(value) {
+  $("#mode").value = value;
+  document.querySelectorAll(".seg-btn").forEach(btn => { const on = btn.dataset.mode === value; btn.classList.toggle("on", on); btn.setAttribute("aria-checked", String(on)); });
+  updateModeHint();
+}
+document.querySelectorAll(".seg-btn").forEach(btn => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
+setMode("fast");
+renderPrompt();
+renderDetected();
+$("#go").addEventListener("click", run);
+$("#cancel").addEventListener("click", cancel);
+$("#zip").addEventListener("click", downloadZip);
+$("#vall").addEventListener("click", () => openEditor(0));
+$("#file").addEventListener("change", e => selectFile(e.target.files?.[0]));
+const drop = $("#drop");
+["dragenter","dragover"].forEach(type => drop.addEventListener(type, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(type => drop.addEventListener(type, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => selectFile(e.dataTransfer.files?.[0]));
+$("#clip-list").addEventListener("click", e => {
+  const copy = e.target.closest("button[data-copy]");
+  if (copy) return copyCaption(state.outputs[Number(copy.dataset.copy)]);
+  const vert = e.target.closest("button[data-vert]");
+  if (vert) return openEditor(Number(vert.dataset.vert));
+  const regen = e.target.closest("button[data-regen]");
+  if (regen) regenerate(Number(regen.dataset.regen), regen);
+});
+
+/* ---------- History (stored only in this browser; videos are never stored) ---------- */
+const HIST_KEY = "clipper.history";
+const histOpen = new Set();
+function loadHistory() {
+  try { const list = JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); return Array.isArray(list) ? list : []; }
+  catch { return []; }
+}
+function saveHistory(list) {
+  for (const keep of [100, 40, 10]) {
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, keep))); return true; } catch {}
+  }
+  return false;
+}
+function ytId(url) {
+  try {
+    const u = new URL(String(url).trim()), host = u.hostname.replace(/^(www|m)\./, "");
+    let id = "";
+    if (host === "youtu.be") id = u.pathname.slice(1).split("/")[0];
+    else if (host.endsWith("youtube.com")) id = u.searchParams.get("v") || (u.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]{11})/) || [])[1] || "";
+    return /^[\w-]{11}$/.test(id) ? id : "";
+  } catch { return ""; }
+}
+function syncHistory() {
+  if (!state.outputs.length) return;
+  const list = loadHistory();
+  let entry = list.find(x => x.id === state.historyId);
+  if (!entry) {
+    entry = { id: `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, ts: Date.now() };
+    state.historyId = entry.id; list.unshift(entry);
+  }
+  Object.assign(entry, {
+    url: state.sessionUrl, videoId: ytId(state.sessionUrl), fileName: state.file?.name || "", notes: state.sessionNotes,
+    clips: state.outputs.map(o => ({ title: o.title, start: o.start, end: o.end, note: o.note, caption: o.caption, tagsText: o.tagsText }))
+  });
+  saveHistory(list); updateHistoryBadge();
+}
+function updateHistoryBadge() { const n = loadHistory().length; $("#hist-count").textContent = n ? String(n) : ""; }
+function previewPlaceholder(vid, start) {
+  return vid
+    ? `<div class="ph"><button class="btn primary" type="button" data-h="play" data-vid="${vid}" data-start="${Math.floor(start)}">▶ Play from ${formatTime(start)}</button><span>Video not stored. Plays from YouTube.</span></div>`
+    : `<div class="ph"><span>Video not stored.</span><span>Add the YouTube link next time to play this moment here.</span></div>`;
+}
+function entryHTML(e) {
+  const open = histOpen.has(e.id), clips = e.clips || [];
+  const when = new Date(e.ts).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  const link = /^https?:\/\//i.test(e.url || "") ? `<a href="${escapeHTML(e.url)}" target="_blank" rel="noopener">${escapeHTML(e.url)}</a>` : escapeHTML(e.url || "No YouTube link saved");
+  let body = "";
+  if (open) {
+    body = `<div class="h-body">
+      ${e.fileName ? `<p class="hint">Video file: ${escapeHTML(e.fileName)}</p>` : ""}
+      <details><summary>Pasted notes</summary><pre>${escapeHTML(e.notes || "")}</pre></details>
+      <div class="clip-actions"><button class="btn" type="button" data-h="reuse">Use these notes again</button></div>
+      ${clips.map((c, j) => `<div class="h-clip">
+        <div class="clip-head"><div class="clip-title">${escapeHTML(c.title || `Clip ${j + 1}`)}</div><div class="clip-time">${formatTime(c.start)}–${formatTime(c.end)}</div></div>
+        <div class="preview">${previewPlaceholder(e.videoId, c.start)}</div>
+        ${capBlockHTML(c.caption, c.tagsText, `hist:${e.id}:${j}`)}
+        <div class="clip-actions"><button class="btn primary" type="button" data-h="copy">Copy caption + hashtags</button></div>
+      </div>`).join("")}
+    </div>`;
+  }
+  return `<article class="h-entry" data-id="${e.id}">
+    <div class="h-head"><button class="h-toggle" type="button" data-h="toggle" aria-expanded="${open}"><div class="h-title">${open ? "▾" : "▸"} ${clips.length} clip${clips.length === 1 ? "" : "s"} · ${escapeHTML(when)}</div><div class="h-sub">${link}</div></button><button class="btn del" type="button" data-h="delete">Delete</button></div>
+    ${body}
+  </article>`;
+}
+function renderHistory() {
+  const list = loadHistory();
+  $("#h-clear").hidden = !list.length;
+  $("#h-list").innerHTML = list.length ? list.map(entryHTML).join("") : `<p class="h-empty">No history yet. Finished clips will appear here.</p>`;
+}
+function openHistory() { renderHistory(); $("#history").hidden = false; }
+function closeHistory() { $("#history").hidden = true; $("#h-list").innerHTML = ""; } // also stops any playing video
+function armed(button, label) { // two-tap confirmation without browser dialogs
+  if (button.dataset.armed) { clearTimeout(button._timer); return true; }
+  const original = button.textContent;
+  button.dataset.armed = "1"; button.textContent = label; button.classList.add("danger");
+  button._timer = setTimeout(() => { delete button.dataset.armed; button.textContent = original; button.classList.remove("danger"); }, 3500);
+  return false;
+}
+function stopPreviews() {
+  document.querySelectorAll("#h-list .preview.playing").forEach(el => { el.classList.remove("playing"); el.innerHTML = el._ph; });
+}
+$("#open-history").addEventListener("click", openHistory);
+$("#h-close").addEventListener("click", closeHistory);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#history").hidden) closeHistory(); });
+$("#h-clear").addEventListener("click", e => {
+  if (!armed(e.currentTarget, "Tap again to delete all")) return;
+  try { localStorage.removeItem(HIST_KEY); } catch {}
+  histOpen.clear(); renderHistory(); updateHistoryBadge(); toast("History deleted.");
+});
+$("#h-list").addEventListener("click", e => {
+  const btn = e.target.closest("[data-h]"); if (!btn) return;
+  const entryEl = btn.closest(".h-entry"), id = entryEl?.dataset.id, kind = btn.dataset.h;
+  if (kind === "toggle") { histOpen.has(id) ? histOpen.delete(id) : histOpen.add(id); renderHistory(); }
+  else if (kind === "delete") {
+    if (!armed(btn, "Tap again")) return;
+    saveHistory(loadHistory().filter(x => x.id !== id)); histOpen.delete(id);
+    if (state.historyId === id) state.historyId = null;
+    renderHistory(); updateHistoryBadge(); toast("Deleted.");
+  } else if (kind === "reuse") {
+    const entry = loadHistory().find(x => x.id === id); if (!entry) return;
+    $("#notes").value = entry.notes || ""; $("#yt").value = entry.url || "";
+    notesChanged(); renderPrompt(); renderDetected(); closeHistory(); window.scrollTo({ top: 0, behavior: "smooth" });
+    toast("Notes and link restored. Upload the video again to cut.");
+  } else if (kind === "copy") {
+    const cap = getCap(btn.closest(".h-clip").querySelector(".cap-block").dataset.src);
+    if (cap) copyText(`${cap.caption}\n\n${cap.tagsText}`, "Caption and hashtags copied.");
+  } else if (kind === "play") {
+    stopPreviews();
+    const box = btn.closest(".preview"); box._ph = box.innerHTML; box.classList.add("playing");
+    box.innerHTML = `<iframe src="https://www.youtube.com/embed/${btn.dataset.vid}?start=${Number(btn.dataset.start) || 0}&autoplay=1&rel=0&playsinline=1" title="YouTube video player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  }
+});
+updateHistoryBadge();
+window.addEventListener("beforeunload", () => {
+  if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
+  state.outputs.forEach(item => URL.revokeObjectURL(item.url));
+});
+</script>
+</body>
+</html>
