@@ -1,14 +1,14 @@
 /**
  * Cloudflare Pages Function: POST /api/highlights
  * Accepts creator-supplied timestamp ranges and notes, then asks Gemini to
- * write one short, direct, debate-sparking caption (6-10 words) and two topic hashtags for each range. Video stays local.
+ * write one short, direct, debate-sparking caption (6-10 words), @MuslimOrthodoxy, and two topic hashtags for each range. Video stays local.
  */
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const DEFAULT_FALLBACK = "gemini-3.5-flash";
 const ALLOWED_MODELS = new Set(["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"]);
 const RETRYABLE = new Set([400, 404, 429, 500, 502, 503, 504]);
-const REQUIRED_TAG = "TheOrthodoxMuslim";
+const REQUIRED_TAG = "@MuslimOrthodoxy";
 const BLOCKED_TAGS = /inter.?faith|inter.?relig|coexist|religious.?unity|religious.?harmony|anti.?muslim|anti.?islam|anti.?christian|anti.?hindu|muslim.?hate|christian.?hate|islam.?hate|hindu.?hate|ex.?muslim|ex.?christian|hate.?group|(?:muslim|islam|christian|christianity|hindu|judaism|jewish).{0,12}(?:hate|lies|liar|fraud|attack|destroy|exposed)|(?:hate|lies|liar|fraud|attack|destroy).{0,12}(?:muslim|islam|christian|christianity|hindu|judaism|jewish)/i;
 const BLOCKED_CAPTION = /inter.?faith|inter.?religious|coexistence between religions|unity between religions|harmony between religions/i;
 
@@ -25,7 +25,7 @@ export async function onRequestPost({ request, env }) {
   catch { return json({ error: "Request body must be valid JSON." }, 400); }
   if (body.mode !== "notes") return json({ error: "Only timestamp-note mode is supported." }, 400);
 
-  const duration = Number.isFinite(Number(body.durationSeconds)) ? Math.max(0, Number(body.durationSeconds)) : 0; // 0 = unknown (file has no length info)
+  const duration = Number.isFinite(Number(body.durationSeconds)) ? Math.max(0, Number(body.durationSeconds)) : 0;
   const clips = validateClips(body.clips, duration);
   if (clips.error) return json({ error: clips.error }, 400);
 
@@ -83,12 +83,12 @@ The creator supplied timestamp ranges and detailed notes for selected moments in
 For every supplied clip, return exactly one output in the same order. Preserve each start and end timestamp exactly. Do not add, remove, reorder, extend, shorten, or overlap any clip.
 
 For each clip:
-- Write one sharp, punchy caption of around 6 to 10 words that highlights the core tension, surprising claim, or pointed question in the creator's note—written to spark real discussion and debate in the comments.
+- Write one sharp, punchy caption of around 6 to 10 words that highlights the core tension, surprising claim, or pointed question in the creator's note, written to spark real discussion and debate in the comments.
 - Be bold and specific, not vague, soft, or overly generous.
 - Do not add generic engagement bait ("Comment below!", "Like and follow!") or unsupported factual claims beyond the note.
 - Focus on the idea, claim, or theological/philosophical argument itself. Do not insult, stereotype, generalize about, or target any religious or other community.
 - Do not frame the content as interfaith connection, interreligious unity, religious coexistence, or normalization of relationships between religions. Avoid those themes and terms.
-- Return exactly three hashtags. The first must be exactly "${REQUIRED_TAG}". The other two must be specific, relevant topics from the note, such as Islam, Christianity, Quran, Bible, theology, polemics, debate, quiz, history, or another genuinely relevant subject. Do not use generic or community-targeting hashtags. Do not use interfaith-related hashtags. Hashtags must be plain text without the # symbol.
+- Return exactly three tags. The first must be exactly "${REQUIRED_TAG}". The other two must be specific, relevant topic hashtags from the note, such as Islam, Christianity, Quran, Bible, theology, polemics, debate, quiz, history, or another genuinely relevant subject (plain text without the # symbol). Do not use generic or community-targeting hashtags. Do not use interfaith-related hashtags.
 
 ${duration > 0 ? `Video duration: ${clock(duration)}.` : "Video duration: unknown."}
 
@@ -134,7 +134,6 @@ async function callGemini(model, key, payload) {
     }
     const message = data?.error?.message || `HTTP ${response.status}`;
     if (response.status === 400 && body.generationConfig?.thinkingConfig) {
-      // Some models reject thinkingConfig; retry once without it.
       body = { ...body, generationConfig: { responseMimeType: body.generationConfig.responseMimeType } };
       continue;
     }
@@ -169,8 +168,8 @@ function normalizeTags(raw, note) {
   const tags = [];
   const input = Array.isArray(raw) ? raw : [];
   for (const value of input) {
-    let tag = String(value || "").trim().replace(/^#+/, "").replace(/[^a-zA-Z0-9_]/g, "");
-    if (!tag || tag.toLowerCase() === REQUIRED_TAG.toLowerCase() || BLOCKED_TAGS.test(tag)) continue;
+    let tag = String(value || "").trim().replace(/^[#@]+/, "").replace(/[^a-zA-Z0-9_]/g, "");
+    if (!tag || tag.toLowerCase() === "muslimorthodoxy" || tag.toLowerCase() === "theorthodoxmuslim" || BLOCKED_TAGS.test(tag)) continue;
     if (!tags.some(existing => existing.toLowerCase() === tag.toLowerCase())) tags.push(tag);
     if (tags.length === 2) break;
   }

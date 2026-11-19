@@ -25,7 +25,7 @@ function setBusyMinimized(min) {
 }
 function showBusy(on, message = "Working...") {
   if (on && !state.busy) { busyMin = false; stageName = ""; clearInterval(clockTimer); clockTimer = setInterval(tickClock, 100); }
-  if (on && message !== stageName) { stageName = message; clockStart = Date.now(); tickClock(); } // the stopwatch restarts at every new step or clip
+  if (on && message !== stageName) { stageName = message; clockStart = Date.now(); tickClock(); }
   if (!on) { busyMin = false; clearInterval(clockTimer); clockTimer = null; stageName = ""; $("#busy-clock").textContent = "0:00.0"; $("#busy-mini-clock").textContent = "0:00.0"; $("#busy-note").textContent = ""; $("#busy-lap").innerHTML = ""; }
   state.busy = on;
   setBusyMinimized(busyMin);
@@ -74,12 +74,14 @@ function slug(text) {
   return String(text || "clip").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,55) || "clip";
 }
 function escapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  return String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
-const tagsText = tags => tags.map(tag => `#${String(tag).replace(/^#/, "")}`).join(" ");
+const tagsText = tags => (tags || []).map(tag => {
+  const s = String(tag || "").trim();
+  return s.startsWith("@") ? s : `#${s.replace(/^#/, "")}`;
+}).join(" ");
 const shareText = item => `${item.caption}\n\n${item.tagsText}`;
 
-/* Keep the screen on while working, so phones do not suspend the tab. */
 let wake = null;
 async function keepAwake(on) {
   try {

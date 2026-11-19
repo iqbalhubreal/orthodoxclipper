@@ -93,8 +93,8 @@
 <div id="busy" role="alertdialog" aria-modal="true" aria-labelledby="busy-text" hidden><div class="busy-box"><div class="spinner"></div><div id="busy-text">Working...</div><div id="busy-clock" aria-hidden="true">0:00.0</div><div id="busy-lap"></div><div class="bar" id="bar" hidden><div id="bar-fill"></div></div><div id="busy-note" class="hint"></div><div class="busy-actions"><button id="busy-min" class="btn" type="button">Minimize</button><button id="cancel" class="btn" type="button">Cancel</button></div></div></div>
 <div id="busy-mini" role="status" aria-live="polite" hidden><div class="spinner busy-mini-spin"></div><div class="busy-mini-info"><div id="busy-mini-text">Working...</div><div id="busy-mini-clock" aria-hidden="true">0:00.0</div></div><button id="busy-max" class="btn" type="button">Show</button></div>
 <div id="editor" role="dialog" aria-modal="true" aria-labelledby="ed-title" hidden><div class="ed-box">
-  <div class="ed-top"><h3 id="ed-title">Frame clip</h3><button id="ed-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
-  <details class="ed-help"><summary>How to use</summary><p class="hint">Two boxes: <b>Top</b> becomes the top half of the vertical video and <b>Bottom</b> the bottom half. Drag inside a box to move it. Drag any <b>edge or corner dot</b> to change its width and height separately. Use the slider to check other moments; the small preview shows the exact result. <b>Fill</b> crops the box edges to fill its half, <b>Fit</b> shows the whole box with black bars. "Apply to all clips" uses these boxes for every clip.</p></details>
+  <div class="ed-top"><h3 id="ed-title">Vertical Maker</h3><button id="ed-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
+  <details class="ed-help"><summary>How to use</summary><p class="hint">Adjust 1 to 4 cropping boxes (default is 2). Drag inside a box to move it, or drag any dot to resize. Use <b>Open Vertical Editor</b> to add blur and overlays, then select clips and export.</p></details>
   <div class="ed-body">
     <div>
       <div class="ed-stage" id="ed-stage"><canvas id="ed-canvas"></canvas></div>
@@ -103,10 +103,13 @@
     <div class="ed-side">
       <canvas id="ed-prev" width="180" height="320"></canvas>
       <div class="ed-tools">
-        <div><p class="ed-cap">Editing box</p><div class="ed-seg" id="ed-sel" role="group" aria-label="Box to edit"><button type="button" data-sel="a" class="on">Top</button><button type="button" data-sel="b">Bottom</button></div></div>
+        <div>
+          <div class="ed-clips-head"><p class="ed-cap">Cropping boxes (<span id="ed-box-count">2</span>/4)</p><div class="ed-box-btns"><button id="ed-add-box" class="btn ed-mini" type="button">+ Box</button><button id="ed-del-box" class="btn ed-mini del" type="button">- Box</button></div></div>
+          <div class="ed-seg" id="ed-sel" role="group" aria-label="Box to edit"></div>
+        </div>
         <div><p class="ed-cap">Box shape in video</p><div class="ed-seg" id="ed-fit" role="group" aria-label="Fill or fit"><button type="button" data-fit="fill" class="on">Fill</button><button type="button" data-fit="fit">Fit</button></div></div>
         <div class="ed-tool-row"><button id="ed-swap" class="btn" type="button">Swap</button><button id="ed-reset" class="btn" type="button">Reset</button></div>
-        <button id="ed-overlays" class="btn" type="button" style="width:100%">Blur &amp; Overlays…</button>
+        <button id="ed-overlays" class="btn" type="button" style="width:100%">Open Vertical Editor</button>
         <div class="ed-clips-wrap">
           <div class="ed-clips-head"><p class="ed-cap">Clips to convert</p><button id="ed-pick-all" class="btn ed-mini" type="button">All</button></div>
           <div id="ed-clips" class="ed-clips"></div>
@@ -117,7 +120,7 @@
   <div class="ed-foot"><button id="ed-all" class="btn" type="button">Apply to all clips</button><button id="ed-done" class="btn primary" type="button">Make this clip vertical</button></div>
 </div></div>
 <div id="veditor" role="dialog" aria-modal="true" aria-labelledby="ved-title" hidden><div class="ed-box">
-  <div class="ed-top"><h3 id="ved-title">Blur &amp; Overlays</h3><button id="ved-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
+  <div class="ed-top"><h3 id="ved-title">Vertical Editor</h3></div>
   <div class="ved-body">
     <div class="ved-preview-col">
       <div class="ed-stage" id="ved-stage"><canvas id="ved-canvas"></canvas></div>
@@ -129,7 +132,7 @@
         <div id="ved-blur-opts" hidden>
           <p class="ed-cap">Blur type</p>
           <div class="ed-seg" id="ved-btype"><button type="button" data-btype="smooth" class="on">Smooth</button><button type="button" data-btype="pixel">Pixel</button><button type="button" data-btype="frosted">Frosted</button></div>
-          <label class="ed-time" style="margin-top:8px">Intensity (<span id="ved-amount-val">18</span>)<input id="ved-amount" type="range" min="4" max="40" value="18"></label>
+          <label class="ed-time" style="margin-top:8px">Intensity (<span id="ved-amount-val">18</span>)<input id="ved-amount" type="range" min="4" max="80" value="18"></label>
         </div>
         <button id="ved-del-layer" class="btn del" type="button" style="width:100%;margin-top:8px">Remove selected</button>
       </div>
@@ -137,17 +140,17 @@
         <div class="ed-clips-head"><p class="ed-cap">Overlays</p><span id="ved-ov-count" class="hint" style="margin:0;font-size:11px">0/5 saved</span></div>
         <div id="ved-ov-list" class="ved-ov-list"></div>
       </div>
-      <div class="ed-clips-wrap">
-        <div class="ed-clips-head"><p class="ed-cap">Apply to clips</p><button id="ved-pick-all" class="btn ed-mini" type="button">All</button></div>
+      <div id="ved-clips-wrap" class="ed-clips-wrap">
+        <div class="ed-clips-head"><p class="ed-cap">Apply to clips</p><div class="ved-count-wrap"><label style="font-size:11px;color:var(--muted)">Count <input id="ved-clip-count" type="number" min="1" max="30" value="1"></label><button id="ved-pick-all" class="btn ed-mini" type="button">All</button></div></div>
         <div id="ved-clips" class="ed-clips"></div>
       </div>
     </div>
   </div>
-  <div class="ed-foot"><button id="ved-apply-all" class="btn" type="button">Apply to all</button><button id="ved-save" class="btn" type="button">Save edits</button><button id="ved-render" class="btn primary" type="button">Save &amp; make vertical</button></div>
+  <div class="ed-foot"><button id="ved-back" class="btn" type="button">Move Back</button><button id="ved-save" class="btn primary" type="button">Save Edits</button></div>
 </div></div>
 <div id="history" role="dialog" aria-modal="true" aria-labelledby="h-title" hidden><div class="h-box">
   <div class="h-top"><h3 id="h-title">History</h3><div class="clip-actions" style="margin:0"><button id="h-clear" class="btn del" type="button">Delete all</button><button id="h-close" class="btn" type="button">Close</button></div></div>
-  <p class="hint">Saved in this browser (videos are not stored).</p>
+  <p class="hint" id="h-notice">Saved in this browser (videos are not stored).</p>
   <div id="h-list"></div>
 </div></div>
 <div id="toast" role="status" aria-live="polite" hidden></div>

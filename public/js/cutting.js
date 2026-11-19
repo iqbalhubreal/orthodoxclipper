@@ -1,27 +1,24 @@
 "use strict";
-/* Cutting clips: Web uses ffmpeg.wasm; Android app uses WebCodecs hardware acceleration (with native/FFmpeg fallback). */
+/* Cutting clips: Web uses ffmpeg.wasm; Android app uses WebCodecs hardware acceleration (with FFmpeg fallback). */
 let nativeCutSeq = 0;
 const nativeCutPending = new Map();
 window.__nativeCutDone = (id, ok, value) => {
-  const cb = nativeCutPending.get(id);
-  if (!cb) return;
+  const p = nativeCutPending.get(id);
+  if (!p) return;
   nativeCutPending.delete(id);
-  cb(ok, value);
+  if (ok) p.resolve(value);
+  else p.reject(new Error(value || "Native cut failed"));
 };
-function cutWithAndroidNative(cutStart, cutEnd, name) {
-  if (!window.AndroidClipper?.cutFast) return Promise.resolve(null);
-  return new Promise(resolve => {
-    const id = String(++nativeCutSeq);
-    nativeCutPending.set(id, async (ok, value) => {
-      if (!ok) { console.warn("Native cut fallback:", value); return resolve(null); }
-      try {
-        const res = await fetch(`/__native_clip__/${encodeURIComponent(value)}`);
-        if (!res.ok) return resolve(null);
-        resolve(await res.blob());
-      } catch { resolve(null); }
-    });
-    window.AndroidClipper.cutFast(id, cutStart, Number.isFinite(cutEnd) ? cutEnd : -1, name);
+async function cutWithAndroidNative(cutStart, cutEnd, outputName) {
+  if (!window.AndroidClipper?.cutFast) return null;
+  const id = `cut_${++nativeCutSeq}`;
+  const fileName = await new Promise((resolve, reject) => {
+    nativeCutPending.set(id, { resolve, reject });
+    window.AndroidClipper.cutFast(id, cutStart, Number.isFinite(cutEnd) ? cutEnd : -1, outputName);
   });
+  const res = await fetch(`/__native_clip__/${encodeURIComponent(fileName)}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Could not read native clip");
+  return await res.blob();
 }
 async function cutWithWebCodecs(cutStart, cutEnd, onProgress) {
   const mb = await getMediabunny();
@@ -36,7 +33,7 @@ async function cutWithWebCodecs(cutStart, cutEnd, onProgress) {
       input,
       output,
       trim,
-      video: { codec: "avc", hardwareAcceleration: "prefer-hardware" },
+      video: { codec: "avc" },
       audio: { codec: "aac" },
     });
     if (!conversion.isValid) return null;
@@ -46,7 +43,7 @@ async function cutWithWebCodecs(cutStart, cutEnd, onProgress) {
     return new Blob([output.target.buffer], { type: "video/mp4" });
   } catch (error) {
     if (state.cancelled) throw error;
-    console.warn("WebCodecs cut unavailable, falling back:", error);
+    console.warn("WebCodecs cut unavailable, falling back to FFmpeg:", error);
     return null;
   } finally {
     state.activeConversion = null;
@@ -58,11 +55,11 @@ async function makeClips(highlights, clips) {
   state.sessionUrl = $("#yt").value.trim(); state.sessionNotes = $("#notes").value;
   const fast = $("#mode").value === "fast";
   let ff = null, input = null;
-  const ensureFFmpegInput = async (forceCopy = false) => {
-    if (ff && input && (!forceCopy || state.input?.type !== "mount")) return;
+  const ensureFFmpegInput = async () => {
+    if (ff && input) return;
     ff = await Promise.race([getFFmpeg(), state.cancelPromise]);
     showBusy(true, "Opening your video...");
-    input = await Promise.race([mountInput(ff, forceCopy), state.cancelPromise]);
+    input = await Promise.race([mountInput(ff), state.cancelPromise]);
   };
   if (!IS_ANDROID_APP) await ensureFFmpegInput();
   state.clipTotal = highlights.length; state.laps = [];
@@ -70,7 +67,7 @@ async function makeClips(highlights, clips) {
     const h = highlights[i];
     state.progressMessage = `Cutting clip ${i + 1} of ${highlights.length}...`;
     setBar(i / highlights.length);
-    showBusy(true, state.progressMessage); // restarts the stopwatch for this clip
+    showBusy(true, state.progressMessage);
     const began = performance.now();
     const cutStart = Math.max(0, h.start - PAD);
     const cutEnd = Math.min(state.duration || Infinity, h.end + PAD);
@@ -80,36 +77,19 @@ async function makeClips(highlights, clips) {
       blob = fast
         ? await Promise.race([cutWithAndroidNative(cutStart, cutEnd, output), state.cancelPromise])
         : await Promise.race([cutWithWebCodecs(cutStart, cutEnd, p => setBar((i + p) / highlights.length)), state.cancelPromise]);
-      if (!blob && !fast) {
-        blob = await Promise.race([cutWithAndroidNative(cutStart, cutEnd, output), state.cancelPromise]);
-      }
       if (blob) showBusy(true, state.progressMessage);
     }
     if (!blob) {
       await ensureFFmpegInput();
       showBusy(true, state.progressMessage);
-      const runFFmpeg = async () => {
-        const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
-        if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
-        else {
-          args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
-        }
-        return Promise.race([ff.exec(args, fast ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
-      };
-      let code;
-      try {
-        code = await runFFmpeg();
-      } catch (err) {
-        if (!state.cancelled && state.input?.type === "mount" && /NotReadableError|FileReaderSync/i.test(String(err))) {
-          await ensureFFmpegInput(true);
-          showBusy(true, state.progressMessage);
-          code = await runFFmpeg();
-        } else {
-          throw err;
-        }
+      const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
+      if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
+      else {
+        args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
       }
-      if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. Try a shorter or smaller H.264 MP4.`);
-      if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an H.264 MP4.`);
+      const code = await Promise.race([ff.exec(args, fast ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
+      if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. This phone may be too slow or low on memory for this video. Try a shorter or smaller H.264 MP4.`);
+      if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
       const bytes = await ff.readFile(output);
       try { await ff.deleteFile(output); } catch {}
       blob = new Blob([bytes], { type: "video/mp4" });
@@ -134,6 +114,7 @@ async function run() {
   state.cancelPromise.catch(() => {});
   try {
     if (!state.file) { openStep(2, true); throw new Error("Upload a video first."); }
+    if (state.metaState === "loading") throw new Error("The video is still being read. Wait a few seconds and try again.");
     const clips = validClips();
     const invalid = state.duration ? clips.find(clip => clip.end > state.duration + 0.5) : null;
     if (invalid) throw new Error(`Clip ${formatTime(invalid.start)}–${formatTime(invalid.end)} ends after the uploaded video.`);
@@ -146,18 +127,18 @@ async function run() {
       if (state.cancelled) throw error;
       console.error(error);
       aiProblem = error.message || String(error);
-      result = { highlights: clips.map((clip, i) => ({ title: `Clip ${i + 1}`, start: clip.start, end: clip.end, caption: clip.note, tags: ["TheOrthodoxMuslim"] })) };
+      result = { highlights: clips.map((clip, i) => ({ title: `Clip ${i + 1}`, start: clip.start, end: clip.end, caption: clip.note, tags: ["@MuslimOrthodoxy"] })) };
       toast("AI captions unavailable. Cutting the clips anyway.", true);
     }
     if (!result.highlights?.length) throw new Error("The AI did not return any clips. Check the timestamp notes and try again.");
-    $("#status").textContent = `${result.highlights.length} clips recognized. Cutting now...`;
+    $("#status").textContent = `${result.highlights.length} timestamp ranges processed. Cutting your clips now...`;
     await makeClips(result.highlights, clips);
-    $("#status").textContent = `Finished. ${state.outputs.length} clips ready.${aiProblem ? " Using your own notes (AI unavailable)." : ""}${overlap ? " " + overlap : ""}`;
+    $("#status").textContent = `Finished. ${state.outputs.length} clips are ready.${aiProblem ? " Captions are your own notes because the AI step failed (" + aiProblem + "). Use Rewrite caption to retry." : ""}${overlap ? " " + overlap : ""}`;
     $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
     toast("Your clips are ready.");
   } catch (error) {
     if (state.cancelled) {
-      $("#status").textContent = state.outputs.length ? "Cancelled. Finished clips are below." : "Cancelled.";
+      $("#status").textContent = state.outputs.length ? "Cancelled. Clips finished so far are below." : "Cancelled.";
       toast("Cancelled.");
     } else {
       console.error(error);
@@ -166,7 +147,7 @@ async function run() {
     }
   } finally {
     state.progressMessage = ""; state.clipTotal = 0; setBar(0);
-    try { syncHistory(); } catch (error) { console.error(error); }
+    try { await syncHistory(true); } catch (error) { console.error(error); }
     await keepAwake(false);
     await unmountInput(state.ffmpeg);
     showBusy(false);
@@ -177,7 +158,6 @@ function cancel() {
   state.abort?.abort();
   try { state.activeConversion?.cancel(); } catch {}
   state.activeConversion = null;
-  nativeCutPending.clear();
   state.rejectCancel?.();
   if (state.ffmpeg) { try { state.ffmpeg.terminate(); } catch {} state.ffmpeg = null; state.input = null; }
 }

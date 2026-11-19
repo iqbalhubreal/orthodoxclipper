@@ -1,15 +1,61 @@
 "use strict";
-/* History stored in this browser (link, notes, captions; never the video). */
-/* ---------- History (stored only in this browser; videos are never stored) ---------- */
+/* History stored in this browser. On mobile, retains only the most recent session's exported clips locally. */
 const HIST_KEY = "clipper.history";
+const MOBILE_CACHE = IS_MOBILE || IS_ANDROID_APP;
+const IDB_NAME = "orthodoxclipper_latest";
+const IDB_STORE = "clips";
 const histOpen = new Set();
+
+function openClipsDB() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) return resolve(null);
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE, { keyPath: "key" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function saveLatestMobileClips() {
+  if (!MOBILE_CACHE || !state.outputs.length) return;
+  try {
+    const db = await openClipsDB();
+    if (!db) return;
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      const store = tx.objectStore(IDB_STORE);
+      store.clear();
+      state.outputs.forEach((o, i) => {
+        if (o.blob) store.put({ key: `h_${i}`, name: o.name, blob: o.blob });
+        if (o.vBlob) store.put({ key: `v_${i}`, name: o.vName, blob: o.vBlob });
+      });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {}
+}
+async function clearLatestMobileClips() {
+  try {
+    const db = await openClipsDB();
+    if (!db) return;
+    await new Promise(resolve => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = tx.onerror = resolve;
+    });
+  } catch {}
+}
+
 function loadHistory() {
   try { const list = JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); return Array.isArray(list) ? list : []; }
   catch { return []; }
 }
 function saveHistory(list) {
-  for (const keep of [100, 40, 10]) {
-    try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, keep))); return true; } catch {}
+  const toSave = MOBILE_CACHE ? list.slice(0, 1) : list;
+  for (const keep of [100, 40, 10, 1]) {
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(toSave.slice(0, keep))); return true; } catch {}
   }
   return false;
 }
@@ -22,25 +68,28 @@ function ytId(url) {
     return /^[\w-]{11}$/.test(id) ? id : "";
   } catch { return ""; }
 }
-function syncHistory() {
+async function syncHistory(replaceClips = false) {
   if (!state.outputs.length) return;
-  const list = loadHistory();
+  let list = loadHistory();
   let entry = list.find(x => x.id === state.historyId);
   if (!entry) {
     entry = { id: `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, ts: Date.now() };
-    state.historyId = entry.id; list.unshift(entry);
+    state.historyId = entry.id;
+    list = MOBILE_CACHE ? [entry] : [entry, ...list];
   }
   Object.assign(entry, {
     url: state.sessionUrl, videoId: ytId(state.sessionUrl), fileName: state.file?.name || "", notes: state.sessionNotes,
-    clips: state.outputs.map(o => ({ title: o.title, start: o.start, end: o.end, note: o.note, caption: o.caption, tagsText: o.tagsText }))
+    clips: state.outputs.map(o => ({ title: o.title, start: o.start, end: o.end, note: o.note, caption: o.caption, tagsText: o.tagsText, hasVert: !!o.vBlob }))
   });
-  saveHistory(list); updateHistoryBadge();
+  saveHistory(list);
+  updateHistoryBadge();
+  if (replaceClips || MOBILE_CACHE) await saveLatestMobileClips();
 }
 function updateHistoryBadge() { const n = loadHistory().length; $("#hist-count").textContent = n ? String(n) : ""; }
 function previewPlaceholder(vid, start) {
   return vid
-    ? `<div class="ph"><button class="btn primary" type="button" data-h="play" data-vid="${vid}" data-start="${Math.floor(start)}">▶ Play from ${formatTime(start)}</button><span>Video not stored. Plays from YouTube.</span></div>`
-    : `<div class="ph"><span>Video not stored.</span><span>Add the YouTube link next time to play this moment here.</span></div>`;
+    ? `<div class="ph"><button class="btn primary" type="button" data-h="play" data-vid="${vid}" data-start="${Math.floor(start)}">▶ Play from ${formatTime(start)}</button><span>Plays from YouTube.</span></div>`
+    : `<div class="ph"><span>No YouTube link saved for preview.</span></div>`;
 }
 function entryHTML(e) {
   const open = histOpen.has(e.id), clips = e.clips || [];
@@ -67,12 +116,18 @@ function entryHTML(e) {
 }
 function renderHistory() {
   const list = loadHistory();
+  const notice = $("#h-notice");
+  if (notice) {
+    notice.textContent = MOBILE_CACHE
+      ? "Mobile storage notice: only clips from your most recent exported session are retained locally. Saving a new session replaces the previous one."
+      : "Saved in this browser (videos are not stored).";
+  }
   $("#h-clear").hidden = !list.length;
   $("#h-list").innerHTML = list.length ? list.map(entryHTML).join("") : `<p class="h-empty">No history yet. Finished clips will appear here.</p>`;
 }
 function openHistory() { renderHistory(); $("#history").hidden = false; }
-function closeHistory() { $("#history").hidden = true; $("#h-list").innerHTML = ""; } // also stops any playing video
-function armed(button, label) { // two-tap confirmation without browser dialogs
+function closeHistory() { $("#history").hidden = true; $("#h-list").innerHTML = ""; }
+function armed(button, label) {
   if (button.dataset.armed) { clearTimeout(button._timer); return true; }
   const original = button.textContent;
   button.dataset.armed = "1"; button.textContent = label; button.classList.add("danger");
@@ -85,18 +140,20 @@ function stopPreviews() {
 $("#open-history").addEventListener("click", openHistory);
 $("#h-close").addEventListener("click", closeHistory);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#history").hidden) closeHistory(); });
-$("#h-clear").addEventListener("click", e => {
+$("#h-clear").addEventListener("click", async e => {
   if (!armed(e.currentTarget, "Tap again to delete all")) return;
   try { localStorage.removeItem(HIST_KEY); } catch {}
+  await clearLatestMobileClips();
   histOpen.clear(); renderHistory(); updateHistoryBadge(); toast("History deleted.");
 });
-$("#h-list").addEventListener("click", e => {
+$("#h-list").addEventListener("click", async e => {
   const btn = e.target.closest("[data-h]"); if (!btn) return;
   const entryEl = btn.closest(".h-entry"), id = entryEl?.dataset.id, kind = btn.dataset.h;
   if (kind === "toggle") { histOpen.has(id) ? histOpen.delete(id) : histOpen.add(id); renderHistory(); }
   else if (kind === "delete") {
     if (!armed(btn, "Tap again")) return;
     saveHistory(loadHistory().filter(x => x.id !== id)); histOpen.delete(id);
+    if (MOBILE_CACHE) await clearLatestMobileClips();
     if (state.historyId === id) state.historyId = null;
     renderHistory(); updateHistoryBadge(); toast("Deleted.");
   } else if (kind === "reuse") {
