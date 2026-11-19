@@ -1,6 +1,5 @@
 "use strict";
 /* Wires up buttons and inputs. Runs after everything else is defined. */
-/* Wire up */
 window.__appHandlesClipDownload = true;
 try { $("#notes").value = localStorage.getItem("clipper.notes") || ""; } catch {}
 $("#notes").addEventListener("input", notesChanged);
@@ -29,8 +28,6 @@ if (IS_ANDROID_APP) {
   if (appNote) appNote.hidden = true;
 } else {
   setMode("fast");
-  const vall = $("#vall");
-  if (vall) vall.textContent = "Make all vertical (Android app only)";
 }
 renderPrompt();
 renderDetected();
@@ -39,8 +36,8 @@ $("#cancel").addEventListener("click", cancel);
 $("#busy-min").addEventListener("click", () => setBusyMinimized(true));
 $("#busy-max").addEventListener("click", () => setBusyMinimized(false));
 $("#zip").addEventListener("click", downloadZip);
+$("#zip-horiz").addEventListener("click", downloadHorizontalZip);
 $("#zip-vert").addEventListener("click", downloadVerticalZip);
-$("#vall").addEventListener("click", () => openEditor(0));
 $("#file").addEventListener("change", e => selectFile(e.target.files?.[0]));
 const drop = $("#drop");
 ["dragenter","dragover"].forEach(type => drop.addEventListener(type, e => { e.preventDefault(); drop.classList.add("over"); }));
