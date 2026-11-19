@@ -22,8 +22,8 @@ function parseNotes(text) {
     if (!line) { open = false; continue; }
     const m = RANGE_RE.exec(line);
     if (m && m.index <= MAX_BEFORE) {
-      const before = line.slice(0, m.index).replace(/^(?:[>#*•\-]+\s*|\d+[.)]\s+)+/, "").replace(/^[\[(\s]+/, "").replace(/[\s([{:|\-–—]+$/, "");
-      const after = line.slice(m.index + m[0].length).replace(/^[\s|:;,.\])}>\-–—]+/, "");
+      const before = line.slice(0, m.index).replace(/^(?:[>#*•\-]+\s*|\d+[.)]\s+)+/, "").replace(/^[\[(\s]+/, "").replace(/[\s([{:|\\-–—]+$/, "");
+      const after = line.slice(m.index + m[0].length).replace(/^[\s|:;,.\\])}>\-\u2013\u2014]+/, "");
       clips.push({ start: parseTime(m[1]), end: parseTime(m[2]), note: [before, after].filter(Boolean).join(": ") });
       open = true;
     } else if (/^#/.test(line)) { open = false;
@@ -69,11 +69,11 @@ Rules:
 - Use exact timestamps from the video in MM:SS format (H:MM:SS if the video is over an hour).
 - List clips in chronological order and do not let them overlap.
 - Pick only genuinely strong moments (usually 5 to 15).
-- For each clip, say in one or two sentences why it is iconic, mentioning what is actually said or happens. This is used to write the caption.
+- For each clip, write 2 to 3 detailed sentences explaining the exact claim, argument, question, verse/reference, or sharp exchange that happens—be specific about what was actually said and why it challenges or surprises the listener, so a direct, debate-sparking caption can be written from it.
 
 Output only a plain list, one clip per line, in exactly this format. No bold, no numbering, no headings, no intro or closing text:
-00:12 - 00:48 | Why this moment is iconic
-01:04 - 02:39 | Why this moment is iconic`;
+00:12 - 00:48 | Detailed note of what is said, the core claim/question, and why it hits hard
+01:04 - 02:39 | Detailed note of what is said, the core claim/question, and why it hits hard`;
 }
 function renderPrompt() { $("#prompt-box").textContent = buildPrompt(); }
 function notesChanged() {
