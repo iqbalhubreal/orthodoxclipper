@@ -1,14 +1,15 @@
 /**
  * Cloudflare Pages Function: POST /api/highlights
  * Accepts creator-supplied timestamp ranges and notes, then asks Gemini to
- * write one short, direct, debate-sparking caption (6-10 words), @MuslimOrthodoxy, and two topic hashtags for each range. Video stays local.
+ * write one short, direct, debate-sparking caption (6-10 words), @MuslimOrthodoxy, #TheOrthodoxMuslim, and two topic hashtags for each range. Video stays local.
  */
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const DEFAULT_FALLBACK = "gemini-3.5-flash";
 const ALLOWED_MODELS = new Set(["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"]);
 const RETRYABLE = new Set([400, 404, 429, 500, 502, 503, 504]);
-const REQUIRED_TAG = "@MuslimOrthodoxy";
+const REQUIRED_MENTION = "@MuslimOrthodoxy";
+const REQUIRED_TAG = "TheOrthodoxMuslim";
 const BLOCKED_TAGS = /inter.?faith|inter.?relig|coexist|religious.?unity|religious.?harmony|anti.?muslim|anti.?islam|anti.?christian|anti.?hindu|muslim.?hate|christian.?hate|islam.?hate|hindu.?hate|ex.?muslim|ex.?christian|hate.?group|(?:muslim|islam|christian|christianity|hindu|judaism|jewish).{0,12}(?:hate|lies|liar|fraud|attack|destroy|exposed)|(?:hate|lies|liar|fraud|attack|destroy).{0,12}(?:muslim|islam|christian|christianity|hindu|judaism|jewish)/i;
 const BLOCKED_CAPTION = /inter.?faith|inter.?religious|coexistence between religions|unity between religions|harmony between religions/i;
 
@@ -88,7 +89,7 @@ For each clip:
 - Do not add generic engagement bait ("Comment below!", "Like and follow!") or unsupported factual claims beyond the note.
 - Focus on the idea, claim, or theological/philosophical argument itself. Do not insult, stereotype, generalize about, or target any religious or other community.
 - Do not frame the content as interfaith connection, interreligious unity, religious coexistence, or normalization of relationships between religions. Avoid those themes and terms.
-- Return exactly three tags. The first must be exactly "${REQUIRED_TAG}". The other two must be specific, relevant topic hashtags from the note, such as Islam, Christianity, Quran, Bible, theology, polemics, debate, quiz, history, or another genuinely relevant subject (plain text without the # symbol). Do not use generic or community-targeting hashtags. Do not use interfaith-related hashtags.
+- Return four tags: the first must be exactly "${REQUIRED_MENTION}", the second must be exactly "${REQUIRED_TAG}", and the other two must be specific, relevant topic hashtags from the note, such as Islam, Christianity, Quran, Bible, theology, polemics, debate, quiz, history, or another genuinely relevant subject (plain text without the # symbol). Do not use generic or community-targeting hashtags. Do not use interfaith-related hashtags.
 
 ${duration > 0 ? `Video duration: ${clock(duration)}.` : "Video duration: unknown."}
 
@@ -100,7 +101,7 @@ Return only JSON in this shape:
       "start": "same as supplied",
       "end": "same as supplied",
       "caption": "6 to 10 word debate-sparking caption",
-      "tags": ["${REQUIRED_TAG}", "topic-one", "topic-two"]
+      "tags": ["${REQUIRED_MENTION}", "${REQUIRED_TAG}", "topic-one", "topic-two"]
     }
   ]
 }
@@ -169,7 +170,7 @@ function normalizeTags(raw, note) {
   const input = Array.isArray(raw) ? raw : [];
   for (const value of input) {
     let tag = String(value || "").trim().replace(/^[#@]+/, "").replace(/[^a-zA-Z0-9_]/g, "");
-    if (!tag || tag.toLowerCase() === "muslimorthodoxy" || tag.toLowerCase() === "theorthodoxmuslim" || BLOCKED_TAGS.test(tag)) continue;
+    if (!tag || tag.toLowerCase() === "muslimorthodoxy" || tag.toLowerCase() === REQUIRED_TAG.toLowerCase() || BLOCKED_TAGS.test(tag)) continue;
     if (!tags.some(existing => existing.toLowerCase() === tag.toLowerCase())) tags.push(tag);
     if (tags.length === 2) break;
   }
@@ -179,7 +180,7 @@ function normalizeTags(raw, note) {
     if (!tags.some(existing => existing.toLowerCase() === candidate.toLowerCase())) tags.push(candidate);
   }
   while (tags.length < 2) tags.push(tags.length === 0 ? "Commentary" : "Theology");
-  return [REQUIRED_TAG, ...tags.slice(0, 2)];
+  return [REQUIRED_MENTION, REQUIRED_TAG, ...tags.slice(0, 2)];
 }
 
 function inferFallbackTags(note) {
