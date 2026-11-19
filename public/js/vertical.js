@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical split-screen: box data, WebCodecs hardware rendering, and FFmpeg fallback. */
+/* Vertical split-screen: box data, WebCodecs hardware rendering (1080x1920), and FFmpeg fallback. */
 /* ---------- Optional step after cutting: vertical split-screen ---------- */
 const ASPECT = 9 / 8; // each half of the output is 9:8, so two stacked halves make a 9:16 video
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -46,7 +46,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
-  const W = IS_MOBILE ? 720 : 1080, H = W * 8 / 9;
+  const W = 1080, H = 960;
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
   let ctx = null, boxes = null;
@@ -56,6 +56,8 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
       output,
       video: {
         codec: "avc",
+        bitrate: 8_000_000,
+        hardwareAcceleration: "prefer-hardware",
         processedWidth: W,
         processedHeight: H * 2,
         process: (sample) => {
@@ -70,6 +72,8 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
               ? new OffscreenCanvas(W, H * 2)
               : Object.assign(document.createElement("canvas"), { width: W, height: H * 2 });
             ctx = canvas.getContext("2d", { alpha: false });
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
           }
           if (frame.fit) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H * 2); }
           for (const { m, yOff } of boxes) {

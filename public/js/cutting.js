@@ -36,7 +36,7 @@ async function cutWithWebCodecs(cutStart, cutEnd, onProgress) {
       input,
       output,
       trim,
-      video: { codec: "avc" },
+      video: { codec: "avc", hardwareAcceleration: "prefer-hardware" },
       audio: { codec: "aac" },
     });
     if (!conversion.isValid) return null;
@@ -94,8 +94,8 @@ async function makeClips(highlights, clips) {
         args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
       }
       const code = await Promise.race([ff.exec(args, fast ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
-      if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. This phone may be too slow or low on memory for this video. Try a shorter or smaller H.264 MP4.`);
-      if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
+      if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. Try a shorter or smaller H.264 MP4.`);
+      if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an H.264 MP4.`);
       const bytes = await ff.readFile(output);
       try { await ff.deleteFile(output); } catch {}
       blob = new Blob([bytes], { type: "video/mp4" });
@@ -120,7 +120,7 @@ async function run() {
   state.cancelPromise.catch(() => {});
   try {
     if (!state.file) { openStep(2, true); throw new Error("Upload a video first."); }
-    if (state.metaState === "loading") throw new Error("The video is still being read. Wait a few seconds and try again.");
+    if (state.metaState === "loading") throw new Error("Reading video info. Try again in a moment.");
     const clips = validClips();
     const invalid = state.duration ? clips.find(clip => clip.end > state.duration + 0.5) : null;
     if (invalid) throw new Error(`Clip ${formatTime(invalid.start)}–${formatTime(invalid.end)} ends after the uploaded video.`);
@@ -137,14 +137,14 @@ async function run() {
       toast("AI captions unavailable. Cutting the clips anyway.", true);
     }
     if (!result.highlights?.length) throw new Error("The AI did not return any clips. Check the timestamp notes and try again.");
-    $("#status").textContent = `${result.highlights.length} timestamp ranges processed. Cutting your clips now...`;
+    $("#status").textContent = `${result.highlights.length} clips recognized. Cutting now...`;
     await makeClips(result.highlights, clips);
-    $("#status").textContent = `Finished. ${state.outputs.length} clips are ready.${aiProblem ? " Captions are your own notes because the AI step failed (" + aiProblem + "). Use Rewrite caption to retry." : ""}${overlap ? " " + overlap : ""}`;
+    $("#status").textContent = `Finished. ${state.outputs.length} clips ready.${aiProblem ? " Using your own notes (AI unavailable)." : ""}${overlap ? " " + overlap : ""}`;
     $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
     toast("Your clips are ready.");
   } catch (error) {
     if (state.cancelled) {
-      $("#status").textContent = state.outputs.length ? "Cancelled. Clips finished so far are below." : "Cancelled.";
+      $("#status").textContent = state.outputs.length ? "Cancelled. Finished clips are below." : "Cancelled.";
       toast("Cancelled.");
     } else {
       console.error(error);

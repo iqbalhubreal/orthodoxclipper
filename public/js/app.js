@@ -1,6 +1,7 @@
 "use strict";
 /* Wires up buttons and inputs. Runs after everything else is defined. */
 /* Wire up */
+const IS_ANDROID_APP = !!window.AndroidClipper || new URLSearchParams(location.search).get("app") === "android";
 try { $("#notes").value = localStorage.getItem("clipper.notes") || ""; } catch {}
 $("#notes").addEventListener("input", notesChanged);
 $("#maxlen").addEventListener("change", () => { renderPrompt(); renderDetected(); });
@@ -20,7 +21,13 @@ function setMode(value) {
   updateModeHint();
 }
 document.querySelectorAll(".seg-btn").forEach(btn => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
-setMode("fast");
+if (IS_ANDROID_APP) {
+  setMode("accurate");
+  const modeRow = $(".mode-row");
+  if (modeRow) modeRow.hidden = true;
+} else {
+  setMode("fast");
+}
 renderPrompt();
 renderDetected();
 $("#go").addEventListener("click", run);

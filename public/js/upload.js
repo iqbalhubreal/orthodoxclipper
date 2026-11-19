@@ -2,16 +2,15 @@
 /* Video upload handling, file warnings and the Fast/Accurate hint. */
 function updateWarnings(file) {
   const mb = file.size / 1048576, notes = [];
-  if (IS_MOBILE && mb > 300) notes.push("This is a large video for a phone. The browser may run out of memory. Fast mode helps, or use a computer for long videos.");
-  else if (mb > 2000) notes.push("This video is over 2 GB. Browsers often fail on files this large. Consider trimming it first or using Fast mode.");
-  if (/\.(mov|m4v)$/i.test(file.name) && IS_MOBILE) notes.push("If cutting fails, the video may be HEVC (H.265). Export it as H.264 MP4.");
+  if (IS_MOBILE && mb > 300) notes.push("Large video for a phone.");
+  else if (mb > 2000) notes.push("Video is over 2 GB and may fail in the browser.");
   $("#warn").textContent = notes.join(" ");
   $("#warn").hidden = !notes.length;
 }
 function updateModeHint() {
   $("#mode-hint").textContent = $("#mode").value === "fast"
-    ? "Fast mode copies the video without re-encoding, so each clip is ready in seconds and uses little memory. A clip may begin up to a few seconds early (at the nearest keyframe), which the 2-second padding usually hides."
-    : "Accurate mode cuts at the exact frame but re-encodes every clip inside your browser. Expect several times the clip length (a 1-minute clip can take 1 to 3 minutes on a computer, much longer on a phone). Use it only if Fast starts a clip too early.";
+    ? "Quickest cut; may start a second or two early."
+    : "Cuts at the exact timestamp.";
 }
 function selectFile(file) {
   if (!file) return;
@@ -35,7 +34,7 @@ function selectFile(file) {
     if (state.file !== file || state.metaState !== "loading") return;
     state.vw = video.videoWidth; state.vh = video.videoHeight;
     if (known()) { state.duration = video.duration; state.metaState = "ready"; $("#file-meta").textContent = `${size} · ${formatTime(state.duration)} long`; }
-    else { state.duration = 0; state.metaState = "unknown"; $("#file-meta").textContent = `${size} · length unknown (this file has no length info). Cutting still works, but clips past the end cannot be checked.`; }
+    else { state.duration = 0; state.metaState = "unknown"; $("#file-meta").textContent = `${size} · length unknown`; }
     renderDetected();
   };
   video.onloadedmetadata = () => {
@@ -45,7 +44,7 @@ function selectFile(file) {
     video.ondurationchange = () => { if (known()) { clearTimeout(timer); finish(); } };
     try { video.currentTime = 1e101; } catch { clearTimeout(timer); finish(); }
   };
-  video.onerror = () => { if (state.metaState === "loading") { state.metaState = "failed"; $("#file-meta").textContent = "Could not read this video in the browser. Cutting may still work; if it fails, try an MP4 (H.264)."; } };
+  video.onerror = () => { if (state.metaState === "loading") { state.metaState = "failed"; $("#file-meta").textContent = "Could not read video info."; } };
   video.src = state.fileUrl;
   renderDetected();
 }
