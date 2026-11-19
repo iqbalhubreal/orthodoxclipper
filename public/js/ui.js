@@ -6,7 +6,19 @@ function tickClock() {
   const ms = Date.now() - clockStart, t = clockText(ms);
   $("#busy-clock").textContent = t;
   $("#busy-mini-clock").textContent = t;
-  $("#busy-note").textContent = ms > 60000 ? "Still working. If nothing changes, press Cancel and try again." : "";
+  if (/vertical/i.test(stageName)) {
+    if (ms > 180000) {
+      $("#busy-note").textContent = IS_ANDROID_APP
+        ? "Still working, keep going..."
+        : "Taking over 3 minutes. Try the Android app for faster performance.";
+    } else {
+      $("#busy-note").textContent = IS_ANDROID_APP
+        ? "Estimated time: ~3 minutes per clip."
+        : "Estimated time: ~3 minutes per clip. Download the Android app below for faster performance.";
+    }
+  } else {
+    $("#busy-note").textContent = ms > 60000 ? "Still working. If nothing changes, press Cancel and try again." : "";
+  }
 }
 function setBusyText(message) {
   $("#busy-text").textContent = message;
@@ -47,6 +59,7 @@ function blobSliceToBase64(slice) {
 async function download(blob, name) {
   if (window.AndroidDownloader?.startSave) {
     toast(`Saving ${name}...`);
+    $("#status").textContent = `Saving ${name} to Downloads...`;
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const CHUNK = 2 * 1024 * 1024;
     window.AndroidDownloader.startSave(id);
@@ -54,8 +67,10 @@ async function download(blob, name) {
       window.AndroidDownloader.appendSave(id, await blobSliceToBase64(blob.slice(offset, offset + CHUNK)));
     }
     window.AndroidDownloader.finishSave(id, name, blob.type || "application/octet-stream");
+    $("#status").textContent = `Saved ${name} to Downloads.`;
     return;
   }
+  toast(`Downloading ${name}...`);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();

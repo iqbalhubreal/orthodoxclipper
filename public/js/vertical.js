@@ -32,10 +32,10 @@ async function runTask(fn, message) {
   state.cancelPromise.catch(() => {});
   showBusy(true, message);
   await keepAwake(true);
-  try { await fn(); toast("Vertical clips ready."); }
+  try { await fn(); toast("Vertical clips ready."); $("#status").textContent = "Vertical clips ready."; }
   catch (error) {
-    if (state.cancelled) toast("Cancelled.");
-    else { console.error(error); toast(error.message || String(error), true); }
+    if (state.cancelled) { toast("Cancelled."); $("#status").textContent = "Vertical conversion cancelled."; }
+    else { console.error(error); toast(error.message || String(error), true); $("#status").textContent = "Vertical conversion failed."; }
   } finally {
     state.progressMessage = ""; state.clipTotal = 0; setBar(0);
     await keepAwake(false);
@@ -133,6 +133,7 @@ async function makeVerticalBatch(indices, frame) {
   for (let n = 0; n < indices.length; n++) {
     state.clipIndex = n;
     state.progressMessage = `Making clip ${indices[n] + 1} vertical (${n + 1} of ${indices.length})...`;
+    $("#status").textContent = state.progressMessage;
     showBusy(true, state.progressMessage); setBar(n / indices.length);
     await makeVertical(state.ffmpeg, indices[n], frame, p => setBar((n + p) / indices.length));
   }

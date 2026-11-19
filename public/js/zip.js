@@ -33,23 +33,29 @@ async function makeZip(files) {
 async function downloadZip() {
   if (!state.outputs.length) return;
   const btn = $("#zip"); btn.disabled = true; btn.textContent = "Preparing zip...";
+  $("#status").textContent = "Preparing zip file...";
+  toast("Preparing zip file...");
   try {
     const files = state.outputs.flatMap(o => [{ name: o.name, blob: o.blob }, ...(o.vBlob ? [{ name: o.vName, blob: o.vBlob }] : [])]);
     const captions = state.outputs.map((o, i) => `Clip ${i + 1}: ${o.title}  (${formatTime(o.start)}-${formatTime(o.end)})\n${shareText(o)}`).join("\n\n---\n\n");
     files.push({ name: "captions.txt", blob: new Blob([captions], { type: "text/plain" }) });
     await download(await makeZip(files), "orthodox-clips.zip");
-  } catch (error) { toast(error.message || "Could not build the zip.", true); }
+    $("#status").textContent = "Zip ready.";
+  } catch (error) { toast(error.message || "Could not build the zip.", true); $("#status").textContent = "Could not prepare zip."; }
   finally { btn.disabled = false; btn.textContent = "Download all (.zip)"; }
 }
 async function downloadVerticalZip() {
   const items = state.outputs.filter(o => o.vBlob);
   if (!items.length) return;
   const btn = $("#zip-vert"); btn.disabled = true; btn.textContent = "Preparing zip...";
+  $("#status").textContent = "Preparing vertical zip file...";
+  toast("Preparing vertical zip file...");
   try {
     const files = items.map(o => ({ name: o.vName, blob: o.vBlob }));
     const captions = items.map((o, i) => `Clip ${i + 1}: ${o.title}  (${formatTime(o.start)}-${formatTime(o.end)})\n${shareText(o)}`).join("\n\n---\n\n");
     files.push({ name: "captions.txt", blob: new Blob([captions], { type: "text/plain" }) });
     await download(await makeZip(files), "orthodox-vertical-clips.zip");
-  } catch (error) { toast(error.message || "Could not build the zip.", true); }
+    $("#status").textContent = "Vertical zip ready.";
+  } catch (error) { toast(error.message || "Could not build the zip.", true); $("#status").textContent = "Could not prepare vertical zip."; }
   finally { btn.disabled = false; btn.textContent = "Download vertical (.zip)"; }
 }

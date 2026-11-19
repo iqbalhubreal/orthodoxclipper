@@ -65,7 +65,7 @@ function cardHTML(item, i) {
         <button class="btn primary" data-copy="${i}" type="button">Copy caption + hashtags</button>
         <a class="btn" href="${item.url}" download="${escapeHTML(item.name)}">Download MP4</a>
         <button class="btn" data-regen="${i}" type="button">Rewrite caption</button>
-        <button class="btn" data-vert="${i}" type="button">Make vertical (not recommended)</button>
+        <button class="btn" data-vert="${i}" type="button">Make vertical</button>
       </div>
       <div class="vbox" id="vbox-${i}" hidden></div>
     </article>`;
