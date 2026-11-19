@@ -1,5 +1,5 @@
 "use strict";
-/* Loads WebCodecs (Mediabunny) for hardware-accelerated encoding, with ffmpeg.wasm as fallback. */
+/* Loads WebCodecs (Mediabunny) for Android app hardware acceleration, and ffmpeg.wasm for web/fallback. */
 async function getMediabunny() {
   if (typeof VideoDecoder === "undefined" || typeof VideoEncoder === "undefined") return null;
   if (state.mb) return state.mb;
@@ -52,11 +52,11 @@ async function getFFmpeg() {
   throw new Error("Could not download the video engine. Check your connection and try again.");
 }
 /* Mount the file read-only instead of copying it into memory (falls back to a copy if unsupported). */
-async function mountInput(ff) {
+async function mountInput(ff, forceCopy = false) {
   await unmountInput(ff);
   const ext = state.file.name.match(/\.[a-z0-9]{1,5}$/i)?.[0]?.toLowerCase() || ".mp4";
   const safe = new File([state.file], `source${ext}`, { type: state.file.type });
-  if (!window.AndroidClipper) {
+  if (!forceCopy && !window.AndroidClipper) {
     try {
       await ff.createDir(MOUNT);
       await ff.mount("WORKERFS", { files: [safe] }, MOUNT);

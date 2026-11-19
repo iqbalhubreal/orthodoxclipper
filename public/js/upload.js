@@ -30,21 +30,31 @@ function selectFile(file) {
   video.preload = "metadata";
   const size = `${(file.size / 1048576).toFixed(1)} MB`;
   const known = () => Number.isFinite(video.duration) && video.duration > 0;
+  let hardTimer = null;
   const finish = () => {
+    clearTimeout(hardTimer);
     if (state.file !== file || state.metaState !== "loading") return;
     state.vw = video.videoWidth; state.vh = video.videoHeight;
     if (known()) { state.duration = video.duration; state.metaState = "ready"; $("#file-meta").textContent = `${size} · ${formatTime(state.duration)} long`; }
     else { state.duration = 0; state.metaState = "unknown"; $("#file-meta").textContent = `${size} · length unknown`; }
     renderDetected();
   };
+  hardTimer = setTimeout(finish, 4000);
   video.onloadedmetadata = () => {
     if (known()) return finish();
     // Some files (screen recordings, live captures) store no length. Seeking far ahead makes the browser work it out.
-    const timer = setTimeout(finish, 6000);
+    const timer = setTimeout(finish, 3000);
     video.ondurationchange = () => { if (known()) { clearTimeout(timer); finish(); } };
     try { video.currentTime = 1e101; } catch { clearTimeout(timer); finish(); }
   };
-  video.onerror = () => { if (state.metaState === "loading") { state.metaState = "failed"; $("#file-meta").textContent = "Could not read video info."; } };
+  video.onerror = () => {
+    clearTimeout(hardTimer);
+    if (state.metaState === "loading") {
+      state.metaState = "failed";
+      $("#file-meta").textContent = `${size} · length unknown`;
+      renderDetected();
+    }
+  };
   video.src = state.fileUrl;
   renderDetected();
 }
