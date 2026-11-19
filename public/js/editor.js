@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical framing editor (1 to 4 adjustable cropping boxes, default 2, canvas, drag handles, preview, mobile layout). */
+/* Vertical framing editor (1 to 4 adjustable cropping boxes, flexible layouts, canvas, drag handles, preview, mobile layout). */
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 const BOX_COLORS = ["#8b79ff", "#42c98b", "#f0b35a", "#38bdf8"];
 const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0 };
@@ -28,6 +28,12 @@ function edSyncUI() {
   $("#ed-swap").disabled = boxes.length <= 1;
   $("#ed-sel").innerHTML = boxes.map((_, idx) =>
     `<button type="button" data-sel="${idx}" class="${idx === ed.sel ? "on" : ""}">${boxLabel(idx, boxes.length)}</button>`
+  ).join("");
+  const presets = getLayoutPresets(boxes.length);
+  if (!presets.some(p => p.id === ed.frame.layout)) ed.frame.layout = presets[0].id;
+  $("#ed-layout-wrap").hidden = boxes.length < 2;
+  $("#ed-layout").innerHTML = presets.map(p =>
+    `<button type="button" data-layout="${p.id}" class="${p.id === ed.frame.layout ? "on" : ""}">${p.label}</button>`
   ).join("");
   document.querySelectorAll("#ed-fit button").forEach(b => b.classList.toggle("on", (b.dataset.fit === "fit") === !!ed.frame.fit));
 }
@@ -69,7 +75,7 @@ async function openEditor(i) {
     state.vw = v.videoWidth; state.vh = v.videoHeight;
     ed.index = i; ed.sel = 0;
     const rawFrame = clone(item.vFrame || state.lastFrame || defaultFrame());
-    ed.frame = { fit: !!rawFrame.fit, boxes: getFrameBoxes(rawFrame) };
+    ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame) };
     const slider = $("#ed-time");
     slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
     $("#ed-title").textContent = `Vertical Maker: ${item.title}`;
@@ -125,15 +131,13 @@ function drawEditor() {
     }
   });
 
-  const P = $("#ed-prev"), p = P.getContext("2d"), stripH = P.height / boxes.length;
+  const P = $("#ed-prev"), p = P.getContext("2d"), slots = getLayoutSlots(boxes.length, ed.frame.layout);
   p.fillStyle = "#000"; p.fillRect(0, 0, P.width, P.height);
   pxBoxes.forEach((r, idx) => {
-    const dy = idx * stripH;
-    const m = mapBox(r, P.width, stripH, ed.frame.fit);
-    p.drawImage(v, m.sx, m.sy, m.sw, m.sh, m.dx, dy + m.dy, m.dw, m.dh);
-    if (idx > 0) {
-      p.strokeStyle = "rgba(255,255,255,.25)"; p.beginPath(); p.moveTo(0, dy); p.lineTo(P.width, dy); p.stroke();
-    }
+    const sl = slots[idx], dx = Math.round(sl.x * P.width), dy = Math.round(sl.y * P.height), dw = Math.round(sl.w * P.width), dh = Math.round(sl.h * P.height);
+    const m = mapBox(r, dw, dh, ed.frame.fit);
+    p.drawImage(v, m.sx, m.sy, m.sw, m.sh, dx + m.dx, dy + m.dy, m.dw, m.dh);
+    p.strokeStyle = "rgba(255,255,255,.25)"; p.strokeRect(dx, dy, dw, dh);
   });
 }
 function edPos(e) {
@@ -196,6 +200,10 @@ $("#ed-time").addEventListener("input", async e => { await edSeek(Number(e.targe
 $("#ed-sel").addEventListener("click", e => {
   const b = e.target.closest("button[data-sel]"); if (!b) return;
   ed.sel = Number(b.dataset.sel); edSyncUI(); drawEditor();
+});
+$("#ed-layout").addEventListener("click", e => {
+  const b = e.target.closest("button[data-layout]"); if (!b) return;
+  ed.frame.layout = b.dataset.layout; edSyncUI(); drawEditor();
 });
 $("#ed-add-box").addEventListener("click", () => {
   const boxes = getFrameBoxes(ed.frame);

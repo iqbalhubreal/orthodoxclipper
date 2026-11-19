@@ -1,7 +1,35 @@
 "use strict";
-/* Vertical split-screen (1-4 cropping boxes): Web uses ffmpeg.wasm; Android app uses WebCodecs hardware rendering (1080x1920) with FFmpeg fallback. */
+/* Vertical split-screen (1-4 cropping boxes + flexible layouts): Web uses ffmpeg.wasm; Android app uses WebCodecs hardware rendering (1080x1920) with FFmpeg fallback. */
 const ASPECT = 9 / 8;
 const clone = o => JSON.parse(JSON.stringify(o));
+const LAYOUT_PRESETS = {
+  1: [
+    { id: "full", label: "Full", slots: [{ x: 0, y: 0, w: 1, h: 1 }] },
+  ],
+  2: [
+    { id: "stack", label: "2 Rows", slots: [{ x: 0, y: 0, w: 1, h: 0.5 }, { x: 0, y: 0.5, w: 1, h: 0.5 }] },
+    { id: "cols", label: "2 Cols", slots: [{ x: 0, y: 0, w: 0.5, h: 1 }, { x: 0.5, y: 0, w: 0.5, h: 1 }] },
+  ],
+  3: [
+    { id: "stack", label: "3 Rows", slots: [{ x: 0, y: 0, w: 1, h: 1 / 3 }, { x: 0, y: 1 / 3, w: 1, h: 1 / 3 }, { x: 0, y: 2 / 3, w: 1, h: 1 / 3 }] },
+    { id: "top2", label: "2 Top + 1", slots: [{ x: 0, y: 0, w: 0.5, h: 0.5 }, { x: 0.5, y: 0, w: 0.5, h: 0.5 }, { x: 0, y: 0.5, w: 1, h: 0.5 }] },
+    { id: "bot2", label: "1 + 2 Bot", slots: [{ x: 0, y: 0, w: 1, h: 0.5 }, { x: 0, y: 0.5, w: 0.5, h: 0.5 }, { x: 0.5, y: 0.5, w: 0.5, h: 0.5 }] },
+    { id: "cols", label: "3 Cols", slots: [{ x: 0, y: 0, w: 1 / 3, h: 1 }, { x: 1 / 3, y: 0, w: 1 / 3, h: 1 }, { x: 2 / 3, y: 0, w: 1 / 3, h: 1 }] },
+  ],
+  4: [
+    { id: "grid", label: "2×2 Grid", slots: [{ x: 0, y: 0, w: 0.5, h: 0.5 }, { x: 0.5, y: 0, w: 0.5, h: 0.5 }, { x: 0, y: 0.5, w: 0.5, h: 0.5 }, { x: 0.5, y: 0.5, w: 0.5, h: 0.5 }] },
+    { id: "stack", label: "4 Rows", slots: [{ x: 0, y: 0, w: 1, h: 0.25 }, { x: 0, y: 0.25, w: 1, h: 0.25 }, { x: 0, y: 0.5, w: 1, h: 0.25 }, { x: 0, y: 0.75, w: 1, h: 0.25 }] },
+    { id: "top3", label: "3 Top + 1", slots: [{ x: 0, y: 0, w: 1 / 3, h: 0.5 }, { x: 1 / 3, y: 0, w: 1 / 3, h: 0.5 }, { x: 2 / 3, y: 0, w: 1 / 3, h: 0.5 }, { x: 0, y: 0.5, w: 1, h: 0.5 }] },
+    { id: "bot3", label: "1 + 3 Bot", slots: [{ x: 0, y: 0, w: 1, h: 0.5 }, { x: 0, y: 0.5, w: 1 / 3, h: 0.5 }, { x: 1 / 3, y: 0.5, w: 1 / 3, h: 0.5 }, { x: 2 / 3, y: 0.5, w: 1 / 3, h: 0.5 }] },
+  ],
+};
+function getLayoutPresets(count) {
+  return LAYOUT_PRESETS[count] || LAYOUT_PRESETS[2];
+}
+function getLayoutSlots(count, layoutId) {
+  const presets = getLayoutPresets(count);
+  return (presets.find(p => p.id === layoutId) || presets[0]).slots;
+}
 function getFrameBoxes(f) {
   if (Array.isArray(f?.boxes) && f.boxes.length) return f.boxes;
   if (f?.a && f?.b) return [f.a, f.b];
@@ -19,22 +47,24 @@ function defaultFrame(count = 2) {
   const vw = state.vw || 16, vh = state.vh || 9;
   const h = 0.86, w = Math.min(0.47, h * ASPECT * vh / vw);
   if (count === 2) {
-    return { fit: false, boxes: [{ x: 0.03, y: 0.07, w, h }, { x: Math.max(0, 0.97 - w), y: 0.07, w, h }] };
+    return { fit: false, layout: "stack", boxes: [{ x: 0.03, y: 0.07, w, h }, { x: Math.max(0, 0.97 - w), y: 0.07, w, h }] };
   }
-  return { fit: false, boxes: Array.from({ length: count }, (_, idx) => defaultBoxAt(idx, count)) };
+  return { fit: false, layout: getLayoutPresets(count)[0].id, boxes: Array.from({ length: count }, (_, idx) => defaultBoxAt(idx, count)) };
 }
 function verticalFilter(f) {
-  const boxes = getFrameBoxes(f), W = 1080, stripH = Math.round(1920 / boxes.length);
+  const boxes = getFrameBoxes(f), slots = getLayoutSlots(boxes.length, f.layout), W = 1080, TOTAL_H = 1920;
+  const even = n => Math.max(2, Math.round(n / 2) * 2);
   const parts = boxes.map((r, idx) => {
-    const tag = `b${idx}`;
+    const slot = slots[idx], sw = even(slot.w * W), sh = even(slot.h * TOTAL_H), tag = `b${idx}`;
     const iw = `iw*${r.w.toFixed(4)}`, ih = `ih*${r.h.toFixed(4)}`, ix = `iw*${r.x.toFixed(4)}`, iy = `ih*${r.y.toFixed(4)}`;
     const crop = `crop=w='max(2,${iw})':h='max(2,${ih})':x='${ix}':y='${iy}'`;
-    if (f.fit) return `[0:v]${crop},scale=${W}:${stripH}:force_original_aspect_ratio=decrease,pad=${W}:${stripH}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[${tag}]`;
-    return `[0:v]${crop},scale=${W}:${stripH}:force_original_aspect_ratio=increase,crop=${W}:${stripH},setsar=1[${tag}]`;
+    if (f.fit) return `[0:v]${crop},scale=${sw}:${sh}:force_original_aspect_ratio=decrease,pad=${sw}:${sh}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[${tag}]`;
+    return `[0:v]${crop},scale=${sw}:${sh}:force_original_aspect_ratio=increase,crop=${sw}:${sh},setsar=1[${tag}]`;
   });
   if (boxes.length === 1) return parts[0].replace("[b0]", "[v]");
   const inputs = boxes.map((_, idx) => `[b${idx}]`).join("");
-  return `${parts.join(";")};${inputs}vstack=inputs=${boxes.length}[v]`;
+  const layout = slots.map(s => `${even(s.x * W)}_${even(s.y * TOTAL_H)}`).join("|");
+  return `${parts.join(";")};${inputs}xstack=inputs=${boxes.length}:layout=${layout}[v]`;
 }
 async function runTask(fn, message) {
   if (state.busy) return;
@@ -60,7 +90,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
   const W = 1080, TOTAL_H = 1920;
   const frameBoxes = getFrameBoxes(frame);
-  const stripH = TOTAL_H / frameBoxes.length;
+  const slots = getLayoutSlots(frameBoxes.length, frame.layout);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
@@ -79,10 +109,12 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
           if (!ctx) {
             const sw = sample.displayWidth, sh = sample.displayHeight;
             const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
-            boxes = frameBoxes.map((box, idx) => ({
-              m: mapBox(px(box), W, stripH, frame.fit),
-              yOff: idx * stripH,
-            }));
+            boxes = frameBoxes.map((box, idx) => {
+              const s = slots[idx];
+              const dx = Math.round(s.x * W), dy = Math.round(s.y * TOTAL_H);
+              const dw = Math.round(s.w * W), dh = Math.round(s.h * TOTAL_H);
+              return { m: mapBox(px(box), dw, dh, frame.fit), xOff: dx, yOff: dy };
+            });
             const canvas = typeof OffscreenCanvas !== "undefined"
               ? new OffscreenCanvas(W, TOTAL_H)
               : Object.assign(document.createElement("canvas"), { width: W, height: TOTAL_H });
@@ -100,8 +132,8 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
           }
           const targetCtx = baseCtx || ctx;
           if (frame.fit) { targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H); }
-          for (const { m, yOff } of boxes) {
-            sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, m.dx, yOff + m.dy, m.dw, m.dh);
+          for (const { m, xOff, yOff } of boxes) {
+            sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
           }
           if (layers.length) {
             ctx.drawImage(baseCv, 0, 0, W, TOTAL_H);

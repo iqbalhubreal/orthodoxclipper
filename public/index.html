@@ -102,6 +102,10 @@
     <div>
       <div class="ed-stage" id="ed-stage"><canvas id="ed-canvas"></canvas></div>
       <label class="ed-time">Pick a moment in this clip<input id="ed-time" type="range"></label>
+      <div id="ed-layout-wrap" class="ed-layout-wrap" hidden>
+        <p class="ed-cap">Layout</p>
+        <div class="ed-seg ed-layout-seg" id="ed-layout" role="group" aria-label="Vertical layout"></div>
+      </div>
     </div>
     <div class="ed-side">
       <canvas id="ed-prev" width="180" height="320"></canvas>
@@ -130,7 +134,7 @@
       <label class="ed-time">Scrub video<input id="ved-time" type="range"></label>
     </div>
     <div class="ved-tools">
-      <div class="ed-tool-row"><button id="ved-add-blur" class="btn" type="button">+ Blur</button><button id="ved-add-text" class="btn" type="button">+ Text</button><button id="ved-import" class="btn" type="button">+ Image</button><input id="ved-file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden></div>
+      <div class="ed-tool-row"><button id="ved-add-blur" class="btn" type="button">+ Blur</button><button id="ved-add-text" class="btn" type="button" hidden>+ Text</button><button id="ved-import" class="btn" type="button">+ Image</button><input id="ved-file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden></div>
       <div id="ved-layer-tools" class="ved-card" hidden>
         <div id="ved-blur-opts" hidden>
           <p class="ed-cap">Blur type</p>
