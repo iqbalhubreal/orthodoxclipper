@@ -1,5 +1,28 @@
 "use strict";
-/* Cutting clips (Fast/Accurate with WebCodecs hardware acceleration + FFmpeg fallback), cancel, rewrite caption. */
+/* Cutting clips (Native Android / Fast copy / WebCodecs Accurate + FFmpeg fallback), cancel, rewrite caption. */
+let nativeCutSeq = 0;
+const nativeCutPending = new Map();
+window.__nativeCutDone = (id, ok, value) => {
+  const cb = nativeCutPending.get(id);
+  if (!cb) return;
+  nativeCutPending.delete(id);
+  cb(ok, value);
+};
+function cutWithAndroidNative(cutStart, cutEnd, name) {
+  if (!window.AndroidClipper?.cutFast) return Promise.resolve(null);
+  return new Promise(resolve => {
+    const id = String(++nativeCutSeq);
+    nativeCutPending.set(id, async (ok, value) => {
+      if (!ok) { console.warn("Native cut fallback:", value); return resolve(null); }
+      try {
+        const res = await fetch(`/__native_clip__/${encodeURIComponent(value)}`);
+        if (!res.ok) return resolve(null);
+        resolve(await res.blob());
+      } catch { resolve(null); }
+    });
+    window.AndroidClipper.cutFast(id, cutStart, Number.isFinite(cutEnd) ? cutEnd : -1, name);
+  });
+}
 async function cutWithWebCodecs(cutStart, cutEnd, onProgress) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
@@ -41,7 +64,7 @@ async function makeClips(highlights, clips) {
     showBusy(true, "Opening your video...");
     input = await Promise.race([mountInput(ff), state.cancelPromise]);
   };
-  if (fast) await ensureFFmpegInput();
+  if (fast && !window.AndroidClipper?.cutFast) await ensureFFmpegInput();
   state.clipTotal = highlights.length; state.laps = [];
   for (let i = 0; i < highlights.length; i++) {
     const h = highlights[i];
@@ -51,8 +74,11 @@ async function makeClips(highlights, clips) {
     const began = performance.now();
     const cutStart = Math.max(0, h.start - PAD);
     const cutEnd = Math.min(state.duration || Infinity, h.end + PAD);
+    const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
     let blob = null;
-    if (!fast) {
+    if (fast) {
+      blob = await Promise.race([cutWithAndroidNative(cutStart, cutEnd, output), state.cancelPromise]);
+    } else {
       blob = await Promise.race([
         cutWithWebCodecs(cutStart, cutEnd, p => setBar((i + p) / highlights.length)),
         state.cancelPromise,
@@ -62,7 +88,6 @@ async function makeClips(highlights, clips) {
     if (!blob) {
       await ensureFFmpegInput();
       showBusy(true, state.progressMessage);
-      const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
       const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
       if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
       else {
@@ -139,6 +164,7 @@ function cancel() {
   state.abort?.abort();
   try { state.activeConversion?.cancel(); } catch {}
   state.activeConversion = null;
+  nativeCutPending.clear();
   state.rejectCancel?.();
   if (state.ffmpeg) { try { state.ffmpeg.terminate(); } catch {} state.ffmpeg = null; state.input = null; }
 }
