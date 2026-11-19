@@ -39,6 +39,8 @@ select{-webkit-appearance:none;appearance:none;background:var(--field) url("data
 #go{color:#fff;width:100%;margin-top:18px;border:0;border-radius:12px;padding:14px 18px;background:linear-gradient(100deg,#7965ed,#927dff);font-weight:750;font-size:15px;cursor:pointer}
 #go:disabled{opacity:.55;cursor:wait}
 #privacy{margin-top:10px;text-align:center;color:var(--muted);font-size:12px}
+#app-note{margin-top:16px;padding:12px 14px;border:1px solid var(--accent);border-radius:12px;background:var(--drop-hover);text-align:center}
+#app-note .hint{margin-top:8px;color:var(--text)}
 #status{margin-top:20px;color:var(--muted);font-size:13px}
 #results{margin-top:22px}
 .results-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
