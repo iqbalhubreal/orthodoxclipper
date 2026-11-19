@@ -25,6 +25,8 @@ renderPrompt();
 renderDetected();
 $("#go").addEventListener("click", run);
 $("#cancel").addEventListener("click", cancel);
+$("#busy-min").addEventListener("click", () => setBusyMinimized(true));
+$("#busy-max").addEventListener("click", () => setBusyMinimized(false));
 $("#zip").addEventListener("click", downloadZip);
 $("#vall").addEventListener("click", () => openEditor(0));
 $("#file").addEventListener("change", e => selectFile(e.target.files?.[0]));

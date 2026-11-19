@@ -1,19 +1,29 @@
 "use strict";
 /* Busy overlay + stopwatch, toasts, downloads, small text helpers, screen wake lock. */
-let clockTimer = null, clockStart = 0, stageName = "";
+let clockTimer = null, clockStart = 0, stageName = "", busyMin = false;
 function clockText(ms) { const t = Math.floor(ms / 100) / 10, m = Math.floor(t / 60); return `${m}:${(t % 60).toFixed(1).padStart(4, "0")}`; }
 function tickClock() {
-  const ms = Date.now() - clockStart;
-  $("#busy-clock").textContent = clockText(ms);
+  const ms = Date.now() - clockStart, t = clockText(ms);
+  $("#busy-clock").textContent = t;
+  $("#busy-mini-clock").textContent = t;
   $("#busy-note").textContent = ms > 60000 ? "Still working. If nothing changes, press Cancel and try again." : "";
 }
-function showBusy(on, message = "Working...") {
-  if (on && !state.busy) { stageName = ""; clearInterval(clockTimer); clockTimer = setInterval(tickClock, 100); }
-  if (on && message !== stageName) { stageName = message; clockStart = Date.now(); tickClock(); } // the stopwatch restarts at every new step or clip
-  if (!on) { clearInterval(clockTimer); clockTimer = null; stageName = ""; $("#busy-clock").textContent = "0:00.0"; $("#busy-note").textContent = ""; $("#busy-lap").innerHTML = ""; }
-  state.busy = on;
-  $("#busy").hidden = !on;
+function setBusyText(message) {
   $("#busy-text").textContent = message;
+  $("#busy-mini-text").textContent = message;
+}
+function setBusyMinimized(min) {
+  busyMin = !!min;
+  $("#busy").hidden = !state.busy || busyMin;
+  $("#busy-mini").hidden = !state.busy || !busyMin;
+}
+function showBusy(on, message = "Working...") {
+  if (on && !state.busy) { busyMin = false; stageName = ""; clearInterval(clockTimer); clockTimer = setInterval(tickClock, 100); }
+  if (on && message !== stageName) { stageName = message; clockStart = Date.now(); tickClock(); } // the stopwatch restarts at every new step or clip
+  if (!on) { busyMin = false; clearInterval(clockTimer); clockTimer = null; stageName = ""; $("#busy-clock").textContent = "0:00.0"; $("#busy-mini-clock").textContent = "0:00.0"; $("#busy-note").textContent = ""; $("#busy-lap").innerHTML = ""; }
+  state.busy = on;
+  setBusyMinimized(busyMin);
+  setBusyText(message);
   $("#go").disabled = on;
   $("#bar").hidden = !(on && state.clipTotal);
 }

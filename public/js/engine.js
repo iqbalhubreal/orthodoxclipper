@@ -24,14 +24,14 @@ async function getFFmpeg() {
       const onProgress = ({ received, total }) => {
         lastBytes = Date.now();
         const mb = n => (n / 1048576).toFixed(1);
-        $("#busy-text").textContent = total > 0 && received <= total
+        setBusyText(total > 0 && received <= total
           ? `Downloading the video engine (first time only)... ${mb(received)} of ${mb(total)} MB`
-          : `Downloading the video engine (first time only)... ${mb(received)} MB`;
+          : `Downloading the video engine (first time only)... ${mb(received)} MB`);
       };
       const coreURL = await Promise.race([toBlobURL(`${base}/ffmpeg-core.js`, "text/javascript"), stalled]);
       const wasmURL = await Promise.race([toBlobURL(`${base}/ffmpeg-core.wasm`, "application/wasm", true, onProgress), stalled]);
       clearInterval(watchdog);
-      $("#busy-text").textContent = "Starting the video engine...";
+      setBusyText("Starting the video engine...");
       await ff.load({ coreURL, wasmURL });
       state.ffmpeg = ff;
       return ff;
