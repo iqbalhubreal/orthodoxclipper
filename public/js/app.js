@@ -1,6 +1,7 @@
 "use strict";
 /* Wires up buttons and inputs. Runs after everything else is defined. */
 /* Wire up */
+window.__appHandlesClipDownload = true;
 try { $("#notes").value = localStorage.getItem("clipper.notes") || ""; } catch {}
 $("#notes").addEventListener("input", notesChanged);
 $("#maxlen").addEventListener("change", () => { renderPrompt(); renderDetected(); });
@@ -43,6 +44,17 @@ const drop = $("#drop");
 ["dragleave","drop"].forEach(type => drop.addEventListener(type, e => { e.preventDefault(); drop.classList.remove("over"); }));
 drop.addEventListener("drop", e => selectFile(e.dataTransfer.files?.[0]));
 $("#clip-list").addEventListener("click", e => {
+  const dl = e.target.closest("a[download]");
+  if (dl && window.AndroidDownloader?.startSave) {
+    const card = dl.closest(".clip");
+    const item = card && state.outputs[Number(card.dataset.i)];
+    if (item) {
+      e.preventDefault();
+      const isVert = !!dl.closest(".vbox");
+      download(isVert ? item.vBlob : item.blob, isVert ? item.vName : item.name);
+      return;
+    }
+  }
   const copy = e.target.closest("button[data-copy]");
   if (copy) return copyCaption(state.outputs[Number(copy.dataset.copy)]);
   const vert = e.target.closest("button[data-vert]");

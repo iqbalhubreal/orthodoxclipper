@@ -16,6 +16,21 @@ function edSyncUI() {
   document.querySelectorAll("#ed-sel button").forEach(b => b.classList.toggle("on", b.dataset.sel === ed.sel));
   document.querySelectorAll("#ed-fit button").forEach(b => b.classList.toggle("on", (b.dataset.fit === "fit") === !!ed.frame.fit));
 }
+function edCheckedIndices() {
+  return [...document.querySelectorAll('#ed-clips input[type="checkbox"]:checked')].map(el => Number(el.value));
+}
+function edSyncClipsBtn() {
+  const n = edCheckedIndices().length;
+  const done = $("#ed-done");
+  done.disabled = n === 0;
+  done.textContent = n <= 1 ? "Make this clip vertical" : `Make ${n} clips vertical`;
+}
+function edRenderClips(activeIndex) {
+  $("#ed-clips").innerHTML = state.outputs.map((item, idx) =>
+    `<label class="ed-clip-opt"><input type="checkbox" value="${idx}"${idx === activeIndex ? " checked" : ""}><span>${idx + 1}. ${escapeHTML(item.title)}</span></label>`
+  ).join("");
+  edSyncClipsBtn();
+}
 function edFitStage() {
   // keep the video frame from getting taller than about half the screen, so the controls stay reachable on phones
   $("#ed-stage").style.maxWidth = `calc(52vh * ${state.vw / state.vh})`;
@@ -35,7 +50,7 @@ async function openEditor(i) {
     const cv = $("#ed-canvas");
     cv.width = Math.min(960, state.vw); cv.height = Math.round(cv.width * state.vh / state.vw);
     ed.scale = cv.width / state.vw;
-    edFitStage(); edSyncUI();
+    edFitStage(); edSyncUI(); edRenderClips(i);
     $("#editor").hidden = false;
     $("#editor").scrollTop = 0;
     document.body.style.overflow = "hidden";
@@ -145,8 +160,21 @@ $("#ed-sel").addEventListener("click", e => { const b = e.target.closest("button
 $("#ed-fit").addEventListener("click", e => { const b = e.target.closest("button[data-fit]"); if (!b) return; ed.frame.fit = b.dataset.fit === "fit"; edSyncUI(); drawEditor(); });
 $("#ed-swap").addEventListener("click", () => { [ed.frame.a, ed.frame.b] = [ed.frame.b, ed.frame.a]; drawEditor(); });
 $("#ed-reset").addEventListener("click", () => { ed.frame = defaultFrame(); edSyncUI(); drawEditor(); });
+$("#ed-clips").addEventListener("change", edSyncClipsBtn);
+$("#ed-pick-all").addEventListener("click", () => {
+  const boxes = [...document.querySelectorAll('#ed-clips input[type="checkbox"]')];
+  const allOn = boxes.every(b => b.checked);
+  boxes.forEach(b => { b.checked = !allOn; });
+  edSyncClipsBtn();
+});
 $("#ed-cancel").addEventListener("click", closeEditor);
-$("#ed-done").addEventListener("click", () => { const frame = clone(ed.frame), i = ed.index; closeEditor(); runTask(() => makeVerticalBatch([i], frame), "Preparing..."); });
+$("#ed-done").addEventListener("click", () => {
+  const list = edCheckedIndices();
+  if (!list.length) return;
+  const frame = clone(ed.frame);
+  closeEditor();
+  runTask(() => makeVerticalBatch(list, frame), "Preparing...");
+});
 $("#ed-all").addEventListener("click", () => { const frame = clone(ed.frame); closeEditor(); runTask(() => makeVerticalBatch(state.outputs.map((_, i) => i), frame), "Preparing..."); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#editor").hidden) closeEditor(); });
 window.addEventListener("resize", () => { if (!$("#editor").hidden && state.edVideo) drawEditor(); });

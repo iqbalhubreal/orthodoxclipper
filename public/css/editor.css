@@ -21,6 +21,14 @@
 .ed-seg button[data-sel="b"].on{background:#2f9d6c}
 .ed-tool-row{display:flex;gap:8px}
 .ed-tool-row .btn{flex:1;min-height:40px}
+.ed-clips-wrap{border:1px solid var(--line);border-radius:11px;padding:8px;background:var(--field)}
+.ed-clips-head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px}
+.ed-clips-head .ed-cap{margin:0}
+.ed-mini{padding:3px 8px;font-size:11.5px;border-radius:7px}
+.ed-clips{display:flex;flex-direction:column;gap:4px;max-height:110px;overflow:auto}
+.ed-clip-opt{display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;padding:3px 2px}
+.ed-clip-opt input{accent-color:var(--accent);flex:none}
+.ed-clip-opt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ed-foot{position:sticky;bottom:0;z-index:2;display:flex;gap:8px;margin:14px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel);border-top:1px solid var(--line);border-radius:0 0 16px 16px}
 .ed-foot .btn{flex:1;min-height:46px;font-size:14px}
 .ed-foot .btn.primary{flex:1.4}

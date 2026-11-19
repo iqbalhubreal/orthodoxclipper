@@ -37,7 +37,25 @@ function toast(message, error = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.hidden = true, error ? 6500 : 2800);
 }
-function download(blob, name) {
+function bytesToBase64(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+async function download(blob, name) {
+  if (window.AndroidDownloader?.startSave) {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const CHUNK = 512 * 1024;
+    window.AndroidDownloader.startSave(id);
+    for (let offset = 0; offset < blob.size; offset += CHUNK) {
+      const buf = await blob.slice(offset, offset + CHUNK).arrayBuffer();
+      window.AndroidDownloader.appendSave(id, bytesToBase64(new Uint8Array(buf)));
+    }
+    window.AndroidDownloader.finishSave(id, name, blob.type || "application/octet-stream");
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
