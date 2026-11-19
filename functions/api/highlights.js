@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function: POST /api/highlights
  * Accepts creator-supplied timestamp ranges and notes, then asks Gemini to
- * write one short, direct, debate-sparking caption (6-10 words), #TheOrthodoxMuslim, @MuslimOrthodoxy, @theorthodoxmuslim, and three topic hashtags for each range. Video stays local.
+ * write one short, direct, debate-sparking caption (6-10 words), #TheOrthodoxMuslim, three topic hashtags, @MuslimOrthodoxy, and @theorthodoxmuslim for each range. Video stays local.
  */
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
@@ -90,7 +90,7 @@ For each clip:
 - Do not add generic engagement bait ("Comment below!", "Like and follow!") or unsupported factual claims beyond the note.
 - Focus on the idea, claim, or theological/philosophical argument itself. Do not insult, stereotype, generalize about, or target any religious or other community.
 - Do not frame the content as interfaith connection, interreligious unity, religious coexistence, or normalization of relationships between religions. Avoid those themes and terms.
-- Return six tags in this order: "${REQUIRED_TAG}", "${REQUIRED_MENTION_1}", "${REQUIRED_MENTION_2}", and three specific, relevant topic hashtags from the note, such as Islam, Christianity, Quran, Bible, theology, polemics, debate, quiz, history, or another genuinely relevant subject (plain text without the # symbol). Do not use generic or community-targeting hashtags. Do not use interfaith-related hashtags.
+- Return six tags in this order: "${REQUIRED_TAG}", three specific, relevant topic hashtags from the note (such as Islam, Christianity, Quran, Bible, theology, polemics, debate, quiz, history, or another genuinely relevant subject, plain text without the # symbol), then "${REQUIRED_MENTION_1}", and "${REQUIRED_MENTION_2}". Do not use generic or community-targeting hashtags. Do not use interfaith-related hashtags.
 
 ${duration > 0 ? `Video duration: ${clock(duration)}.` : "Video duration: unknown."}
 
@@ -102,7 +102,7 @@ Return only JSON in this shape:
       "start": "same as supplied",
       "end": "same as supplied",
       "caption": "6 to 10 word debate-sparking caption",
-      "tags": ["${REQUIRED_TAG}", "${REQUIRED_MENTION_1}", "${REQUIRED_MENTION_2}", "topic-one", "topic-two", "topic-three"]
+      "tags": ["${REQUIRED_TAG}", "topic-one", "topic-two", "topic-three", "${REQUIRED_MENTION_1}", "${REQUIRED_MENTION_2}"]
     }
   ]
 }
@@ -185,7 +185,7 @@ function normalizeTags(raw, note) {
     if (tags.length >= 3) break;
     if (!tags.some(existing => existing.toLowerCase() === d.toLowerCase())) tags.push(d);
   }
-  return [REQUIRED_TAG, REQUIRED_MENTION_1, REQUIRED_MENTION_2, ...tags.slice(0, 3)];
+  return [REQUIRED_TAG, ...tags.slice(0, 3), REQUIRED_MENTION_1, REQUIRED_MENTION_2];
 }
 
 function inferFallbackTags(note) {

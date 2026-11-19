@@ -127,7 +127,7 @@ async function run() {
       if (state.cancelled) throw error;
       console.error(error);
       aiProblem = error.message || String(error);
-      result = { highlights: clips.map((clip, i) => ({ title: `Clip ${i + 1}`, start: clip.start, end: clip.end, caption: clip.note, tags: ["TheOrthodoxMuslim", "@MuslimOrthodoxy", "@theorthodoxmuslim", "Commentary", "Theology", "Islam"] })) };
+      result = { highlights: clips.map((clip, i) => ({ title: `Clip ${i + 1}`, start: clip.start, end: clip.end, caption: clip.note, tags: ["TheOrthodoxMuslim", "Commentary", "Theology", "Islam", "@MuslimOrthodoxy", "@theorthodoxmuslim"] })) };
       toast("AI captions unavailable. Cutting the clips anyway.", true);
     }
     if (!result.highlights?.length) throw new Error("The AI did not return any clips. Check the timestamp notes and try again.");
