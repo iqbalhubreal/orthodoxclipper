@@ -23,35 +23,34 @@ function selectFile(file) {
   state.duration = 0; state.metaState = "loading";
   state.vw = state.vh = 0; state.lastFrame = null;
   state.fileUrl = URL.createObjectURL(file);
+  const size = `${(file.size / 1048576).toFixed(1)} MB`;
   $("#file-name").textContent = file.name;
-  $("#file-meta").textContent = `${(file.size / 1048576).toFixed(1)} MB · Reading duration...`;
+  $("#file-meta").textContent = `${size} · unknown`;
   updateWarnings(file);
   const video = document.createElement("video");
   video.preload = "metadata";
-  const size = `${(file.size / 1048576).toFixed(1)} MB`;
   const known = () => Number.isFinite(video.duration) && video.duration > 0;
   let hardTimer = null;
   const finish = () => {
     clearTimeout(hardTimer);
     if (state.file !== file || state.metaState !== "loading") return;
     state.vw = video.videoWidth; state.vh = video.videoHeight;
-    if (known()) { state.duration = video.duration; state.metaState = "ready"; $("#file-meta").textContent = `${size} · ${formatTime(state.duration)} long`; }
-    else { state.duration = 0; state.metaState = "unknown"; $("#file-meta").textContent = `${size} · length unknown`; }
+    if (known()) { state.duration = video.duration; state.metaState = "ready"; $("#file-meta").textContent = `${size} · ${formatTime(state.duration)}`; }
+    else { state.duration = 0; state.metaState = "unknown"; $("#file-meta").textContent = `${size} · unknown`; }
     renderDetected();
   };
-  hardTimer = setTimeout(finish, 4000);
+  hardTimer = setTimeout(finish, 3000);
   video.onloadedmetadata = () => {
     if (known()) return finish();
-    // Some files (screen recordings, live captures) store no length. Seeking far ahead makes the browser work it out.
-    const timer = setTimeout(finish, 3000);
+    const timer = setTimeout(finish, 2500);
     video.ondurationchange = () => { if (known()) { clearTimeout(timer); finish(); } };
     try { video.currentTime = 1e101; } catch { clearTimeout(timer); finish(); }
   };
   video.onerror = () => {
     clearTimeout(hardTimer);
     if (state.metaState === "loading") {
-      state.metaState = "failed";
-      $("#file-meta").textContent = `${size} · length unknown`;
+      state.metaState = "unknown";
+      $("#file-meta").textContent = `${size} · unknown`;
       renderDetected();
     }
   };

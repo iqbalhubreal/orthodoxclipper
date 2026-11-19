@@ -134,7 +134,6 @@ async function run() {
   state.cancelPromise.catch(() => {});
   try {
     if (!state.file) { openStep(2, true); throw new Error("Upload a video first."); }
-    if (state.metaState === "loading") throw new Error("Reading video info. Try again in a moment.");
     const clips = validClips();
     const invalid = state.duration ? clips.find(clip => clip.end > state.duration + 0.5) : null;
     if (invalid) throw new Error(`Clip ${formatTime(invalid.start)}–${formatTime(invalid.end)} ends after the uploaded video.`);
