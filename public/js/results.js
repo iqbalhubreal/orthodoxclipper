@@ -66,6 +66,7 @@ function cardHTML(item, i) {
         <button class="btn primary" data-copy="${i}" type="button">Copy caption + hashtags</button>
         <a class="btn" href="${item.url}" download="${escapeHTML(item.name)}">Download MP4</a>
         <button class="btn" data-regen="${i}" type="button">Rewrite caption</button>
+        <button class="btn" data-vedit="${i}" type="button">Blur &amp; Overlays</button>
         <button class="btn" data-vert="${i}" type="button">${vertLabel}</button>
       </div>
       <div class="vbox" id="vbox-${i}" hidden></div>

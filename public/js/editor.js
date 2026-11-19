@@ -49,7 +49,7 @@ async function openEditor(i) {
   try {
     await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
     state.vw = v.videoWidth; state.vh = v.videoHeight;
-    ed.index = i; ed.sel = "a"; ed.frame = clone(state.lastFrame || defaultFrame());
+    ed.index = i; ed.sel = "a"; ed.frame = clone(item.vFrame || state.lastFrame || defaultFrame());
     const slider = $("#ed-time");
     slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
     $("#ed-title").textContent = `Make vertical: ${item.title}`;
@@ -166,6 +166,12 @@ $("#ed-sel").addEventListener("click", e => { const b = e.target.closest("button
 $("#ed-fit").addEventListener("click", e => { const b = e.target.closest("button[data-fit]"); if (!b) return; ed.frame.fit = b.dataset.fit === "fit"; edSyncUI(); drawEditor(); });
 $("#ed-swap").addEventListener("click", () => { [ed.frame.a, ed.frame.b] = [ed.frame.b, ed.frame.a]; drawEditor(); });
 $("#ed-reset").addEventListener("click", () => { ed.frame = defaultFrame(); edSyncUI(); drawEditor(); });
+$("#ed-overlays").addEventListener("click", () => {
+  const frame = clone(ed.frame), idx = ed.index;
+  if (state.outputs[idx]) state.outputs[idx].vFrame = clone(frame);
+  closeEditor();
+  openVerticalEditor(idx, { frame, returnToEditor: true });
+});
 $("#ed-clips").addEventListener("change", edSyncClipsBtn);
 $("#ed-pick-all").addEventListener("click", () => {
   const boxes = [...document.querySelectorAll('#ed-clips input[type="checkbox"]')];

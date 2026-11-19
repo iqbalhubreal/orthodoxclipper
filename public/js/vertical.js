@@ -3,27 +3,21 @@
 /* ---------- Optional step after cutting: vertical split-screen ---------- */
 const ASPECT = 9 / 8; // each half of the output is 9:8, so two stacked halves make a 9:16 video
 const clone = o => JSON.parse(JSON.stringify(o));
-/* A box is { x, y, w, h } as fractions of the video size; frame = { a: top, b: bottom, fit: bool }. Width and height are independent. */
 function defaultFrame() {
-  const { vw, vh } = state;
-  const w = Math.min(vw / 2, vh * ASPECT), h = w / ASPECT;
-  const y = (vh - h) / 2, xa = (vw / 2 - w) / 2, xb = vw / 2 + xa;
-  return { a: { x: xa / vw, y: y / vh, w: w / vw, h: h / vh }, b: { x: xb / vw, y: y / vh, w: w / vw, h: h / vh }, fit: false };
+  const vw = state.vw || 16, vh = state.vh || 9;
+  const h = 0.86, w = Math.min(0.47, h * ASPECT * vh / vw);
+  return { fit: false, a: { x: 0.03, y: 0.07, w, h }, b: { x: Math.max(0, 0.97 - w), y: 0.07, w, h } };
 }
-function verticalFilter(fr) {
-  const { vw, vh } = state, W = IS_MOBILE ? 720 : 1080, H = W * 8 / 9;
-  const evenSize = n => Math.max(2, Math.floor(n / 2) * 2), evenPos = n => Math.max(0, Math.floor(n / 2) * 2);
-  const box = r => {
-    const w = Math.min(evenSize(r.w * vw), evenSize(vw)), h = Math.min(evenSize(r.h * vh), evenSize(vh));
-    const x = evenPos(Math.min(r.x * vw, vw - w)), y = evenPos(Math.min(r.y * vh, vh - h));
-    const fitStep = fr.fit
-      ? `scale=${W}:${H}:force_original_aspect_ratio=decrease:flags=bicubic,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:black`
-      : `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=bicubic,crop=${W}:${H}`;
-    return `crop=${w}:${h}:${x}:${y},${fitStep},setsar=1`;
+function verticalFilter(f) {
+  const W = 1080, H = 960; // each half is 1080x960 -> stacked to 1080x1920
+  const half = (r, tag) => {
+    const iw = `iw*${r.w.toFixed(4)}`, ih = `ih*${r.h.toFixed(4)}`, ix = `iw*${r.x.toFixed(4)}`, iy = `ih*${r.y.toFixed(4)}`;
+    const crop = `crop=w='max(2,${iw})':h='max(2,${ih})':x='${ix}':y='${iy}'`;
+    if (f.fit) return `[0:v]${crop},scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[${tag}]`;
+    return `[0:v]${crop},scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1[${tag}]`;
   };
-  return `[0:v]split=2[a][b];[a]${box(fr.a)}[t];[b]${box(fr.b)}[u];[t][u]vstack=inputs=2[v]`;
+  return `${half(f.a, "t")};${half(f.b, "b")};[t][b]vstack=inputs=2[v]`;
 }
-/* Runs a cancellable background task behind the busy overlay. */
 async function runTask(fn, message) {
   if (state.busy) return;
   state.cancelled = false;
@@ -47,9 +41,10 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
   if (!mb || state.cancelled) return null;
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
   const W = 1080, H = 960;
+  const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-  let ctx = null, boxes = null;
+  let ctx = null, baseCv = null, baseCtx = null, boxes = null;
   try {
     const conversion = await Conversion.init({
       input,
@@ -74,10 +69,23 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
             ctx = canvas.getContext("2d", { alpha: false });
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "medium";
+            if (layers.length) {
+              baseCv = typeof OffscreenCanvas !== "undefined"
+                ? new OffscreenCanvas(W, H * 2)
+                : Object.assign(document.createElement("canvas"), { width: W, height: H * 2 });
+              baseCtx = baseCv.getContext("2d", { alpha: false });
+              baseCtx.imageSmoothingEnabled = true;
+              baseCtx.imageSmoothingQuality = "medium";
+            }
           }
-          if (frame.fit) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H * 2); }
+          const targetCtx = baseCtx || ctx;
+          if (frame.fit) { targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, H * 2); }
           for (const { m, yOff } of boxes) {
-            sample.draw(ctx, m.sx, m.sy, m.sw, m.sh, m.dx, yOff + m.dy, m.dw, m.dh);
+            sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, m.dx, yOff + m.dy, m.dw, m.dh);
+          }
+          if (layers.length) {
+            ctx.drawImage(baseCv, 0, 0, W, H * 2);
+            drawVerticalLayers(ctx, baseCv, W, H * 2, layers);
           }
           return ctx.canvas;
         },
@@ -99,6 +107,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
 }
 async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
+  item.vFrame = clone(frame);
   let vBlob = IS_ANDROID_APP
     ? await Promise.race([makeVerticalWebCodecs(item, frame, onProgress), state.cancelPromise])
     : null;
@@ -122,7 +131,7 @@ async function makeVertical(ff, i, frame, onProgress) {
   item.vName = item.name.replace(/\.mp4$/, "") + "-vertical.mp4";
   const box = $(`#vbox-${i}`);
   box.hidden = false;
-  box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a><button class="btn" data-vedit="${i}" type="button">Edit / Blur &amp; Overlays</button></div>`;
+  box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a></div>`;
   const btn = document.querySelector(`button[data-vert="${i}"]`);
   if (btn) btn.textContent = "Redo vertical";
   updateResultsHeader();

@@ -27,40 +27,41 @@
 <main>
 <section class="how" aria-label="How it works">
   <div class="how-card"><div class="how-ico">✦</div><div><h3>1. Ask Gemini</h3><p>Copy the prompt with your link.</p></div></div>
-  <div class="how-card"><div class="how-ico">⧉</div><div><h3>2. Paste timestamps</h3><p>Drop Gemini's reply below.</p></div></div>
-  <div class="how-card"><div class="how-ico">✂</div><div><h3>3. Get clips</h3><p>Cut on your device with captions.</p></div></div>
+  <div class="how-card"><div class="how-ico">⧉</div><div><h3>2. Paste answer</h3><p>Clips are detected automatically.</p></div></div>
+  <div class="how-card"><div class="how-ico">✂</div><div><h3>3. Get clips</h3><p>Upload video to cut on your device.</p></div></div>
 </section>
 <section class="panel">
   <details class="step" id="step1">
   <summary><h2 class="section-title"><span class="num">1</span>Get timestamps from Gemini</h2><span class="step-note"></span><span class="chev" aria-hidden="true"></span></summary>
   <div class="step-body">
-  <p class="hint">Paste your YouTube link, copy the prompt, then paste it into <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a>.</p>
+  <p class="hint">Paste your YouTube link, copy the prompt, then paste it into <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a>. Chat or agent mode both work.</p>
   <div class="opts" style="margin-top:12px">
     <label>YouTube link<input id="yt" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"></label>
     <label>Longest clip<select id="maxlen"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="3" selected>3 minutes</option></select></label>
   </div>
   <pre id="prompt-box" tabindex="0" aria-label="Prompt for Gemini"></pre>
   <div class="clip-actions"><button id="copy-prompt" class="btn primary" type="button">Copy prompt</button><a class="btn" href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini</a></div>
+  <p class="hint">Gemini's timestamps can be a few seconds off. Skim your clips afterwards and adjust the notes if needed.</p>
   </div>
   </details>
 
   <details class="step" id="step2" open>
-  <summary><h2 class="section-title"><span class="num" id="n2">2</span>Upload video</h2><span class="step-note" id="s2-note"></span><span class="chev" aria-hidden="true"></span></summary>
+  <summary><h2 class="section-title"><span class="num" id="n2">2</span>Upload the same video</h2><span class="step-note" id="s2-note"></span><span class="chev" aria-hidden="true"></span></summary>
   <div class="step-body">
   <label id="drop" for="file">
     <input id="file" type="file" accept="video/*" hidden>
     <span id="drop-icon">＋</span>
     <span id="file-name">Choose a video or drop it here</span>
-    <span id="file-meta">MP4, MOV, WebM</span>
+    <span id="file-meta">MP4, MOV, WebM and other browser-supported video files</span>
   </label>
   <div id="warn" class="warn" role="note" hidden></div>
   </div>
   </details>
 
   <details class="step" id="step3" open>
-  <summary><h2 class="section-title"><span class="num" id="n3">3</span>Paste timestamps</h2><span class="step-note" id="s3-note"></span><span class="chev" aria-hidden="true"></span></summary>
+  <summary><h2 class="section-title"><span class="num" id="n3">3</span>Paste Gemini's answer</h2><span class="step-note" id="s3-note"></span><span class="chev" aria-hidden="true"></span></summary>
   <div class="step-body">
-  <p class="hint" style="margin-bottom:10px">One clip per line: time range, then the reason.</p>
+  <p class="hint" style="margin-bottom:10px">One clip per line: a time range, then the reason. Bold text, bullets and numbering from Gemini are fine. Your notes are saved in this browser.</p>
   <div class="tools"><button id="paste" class="btn" type="button">Paste from clipboard</button><button id="clear" class="btn" type="button">Clear</button></div>
   <textarea id="notes" spellcheck="false" aria-label="Timestamp notes" placeholder="00:12 - 00:48 | A powerful explanation of the main point.&#10;01:04 - 01:39 | A sharp response that makes the argument clear.&#10;02:10 - 02:52 | A quiz moment with a surprising answer."></textarea>
   <div id="detected" aria-live="polite" hidden></div>
@@ -70,8 +71,8 @@
   <div class="mode-row">
     <div class="mode-label">Cutting mode</div>
     <div class="seg" role="radiogroup" aria-label="Cutting mode">
-      <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-mode="fast"><b>Fast</b><small>Quick copy</small></button>
-      <button type="button" class="seg-btn" role="radio" aria-checked="false" data-mode="accurate"><b>Accurate</b><small>Exact timestamp</small></button>
+      <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-mode="fast"><b>Fast</b><small>Ready in seconds</small></button>
+      <button type="button" class="seg-btn" role="radio" aria-checked="false" data-mode="accurate"><b>Accurate</b><small>Exact frame</small></button>
     </div>
     <input type="hidden" id="mode" value="fast">
     <p class="hint" id="mode-hint"></p>
@@ -93,7 +94,7 @@
 <div id="busy-mini" role="status" aria-live="polite" hidden><div class="spinner busy-mini-spin"></div><div class="busy-mini-info"><div id="busy-mini-text">Working...</div><div id="busy-mini-clock" aria-hidden="true">0:00.0</div></div><button id="busy-max" class="btn" type="button">Show</button></div>
 <div id="editor" role="dialog" aria-modal="true" aria-labelledby="ed-title" hidden><div class="ed-box">
   <div class="ed-top"><h3 id="ed-title">Frame clip</h3><button id="ed-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
-  <details class="ed-help"><summary>How to use</summary><p class="hint">Drag the <b>Top</b> and <b>Bottom</b> boxes over each speaker. <b>Fill</b> crops to fit; <b>Fit</b> keeps the whole box.</p></details>
+  <details class="ed-help"><summary>How to use</summary><p class="hint">Two boxes: <b>Top</b> becomes the top half of the vertical video and <b>Bottom</b> the bottom half. Drag inside a box to move it. Drag any <b>edge or corner dot</b> to change its width and height separately. Use the slider to check other moments; the small preview shows the exact result. <b>Fill</b> crops the box edges to fill its half, <b>Fit</b> shows the whole box with black bars. "Apply to all clips" uses these boxes for every clip.</p></details>
   <div class="ed-body">
     <div>
       <div class="ed-stage" id="ed-stage"><canvas id="ed-canvas"></canvas></div>
@@ -105,6 +106,7 @@
         <div><p class="ed-cap">Editing box</p><div class="ed-seg" id="ed-sel" role="group" aria-label="Box to edit"><button type="button" data-sel="a" class="on">Top</button><button type="button" data-sel="b">Bottom</button></div></div>
         <div><p class="ed-cap">Box shape in video</p><div class="ed-seg" id="ed-fit" role="group" aria-label="Fill or fit"><button type="button" data-fit="fill" class="on">Fill</button><button type="button" data-fit="fit">Fit</button></div></div>
         <div class="ed-tool-row"><button id="ed-swap" class="btn" type="button">Swap</button><button id="ed-reset" class="btn" type="button">Reset</button></div>
+        <button id="ed-overlays" class="btn" type="button" style="width:100%">Blur &amp; Overlays…</button>
         <div class="ed-clips-wrap">
           <div class="ed-clips-head"><p class="ed-cap">Clips to convert</p><button id="ed-pick-all" class="btn ed-mini" type="button">All</button></div>
           <div id="ed-clips" class="ed-clips"></div>
@@ -115,7 +117,7 @@
   <div class="ed-foot"><button id="ed-all" class="btn" type="button">Apply to all clips</button><button id="ed-done" class="btn primary" type="button">Make this clip vertical</button></div>
 </div></div>
 <div id="veditor" role="dialog" aria-modal="true" aria-labelledby="ved-title" hidden><div class="ed-box">
-  <div class="ed-top"><h3 id="ved-title">Edit vertical</h3><button id="ved-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
+  <div class="ed-top"><h3 id="ved-title">Blur &amp; Overlays</h3><button id="ved-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
   <div class="ved-body">
     <div class="ved-preview-col">
       <div class="ed-stage" id="ved-stage"><canvas id="ved-canvas"></canvas></div>
@@ -135,9 +137,13 @@
         <div class="ed-clips-head"><p class="ed-cap">Overlays</p><span id="ved-ov-count" class="hint" style="margin:0;font-size:11px">0/5 saved</span></div>
         <div id="ved-ov-list" class="ved-ov-list"></div>
       </div>
+      <div class="ed-clips-wrap">
+        <div class="ed-clips-head"><p class="ed-cap">Apply to clips</p><button id="ved-pick-all" class="btn ed-mini" type="button">All</button></div>
+        <div id="ved-clips" class="ed-clips"></div>
+      </div>
     </div>
   </div>
-  <div class="ed-foot"><button id="ved-save" class="btn primary" type="button">Apply &amp; save vertical</button></div>
+  <div class="ed-foot"><button id="ved-apply-all" class="btn" type="button">Apply to all</button><button id="ved-save" class="btn" type="button">Save edits</button><button id="ved-render" class="btn primary" type="button">Save &amp; make vertical</button></div>
 </div></div>
 <div id="history" role="dialog" aria-modal="true" aria-labelledby="h-title" hidden><div class="h-box">
   <div class="h-top"><h3 id="h-title">History</h3><div class="clip-actions" style="margin:0"><button id="h-clear" class="btn del" type="button">Delete all</button><button id="h-close" class="btn" type="button">Close</button></div></div>

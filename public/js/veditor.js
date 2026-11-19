@@ -1,8 +1,31 @@
 "use strict";
-/* Post-vertical editor: add blur rectangles (type + intensity) and image overlays (presets + saved), drag/resize, export 1080x1920. */
-const ved = { index: 0, layers: [], sel: -1, drag: null, scale: 1, k: 1, video: null, baseCv: null, pixCv: null };
-const VED_HANDLES = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+/* Pre-vertical editor: add blur rectangles (type + intensity) and image overlays (presets + saved), drag/resize with bottom-right dot, apply to all/selected clips. */
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false };
+const VED_HANDLE = [1, 1];
 
+function cloneLayers(layers) {
+  return (layers || []).map(l => {
+    const copy = { kind: l.kind, x: l.x, y: l.y, w: l.w, h: l.h };
+    if (l.kind === "blur") { copy.blurType = l.blurType; copy.amount = l.amount; }
+    else { copy.name = l.name; copy.url = l.url; copy.aspect = l.aspect; }
+    return copy;
+  });
+}
+function preloadLayerImages(layers) {
+  return Promise.all((layers || []).map(l => new Promise(resolve => {
+    if (l.kind !== "image" || !l.url) return resolve({ ...l });
+    if (l.img && l.img.complete && l.img.naturalWidth) return resolve({ ...l });
+    const img = new Image();
+    img.onload = () => resolve({ ...l, img });
+    img.onerror = () => resolve({ ...l, img: null });
+    img.src = l.url;
+  })));
+}
+function refreshClipVEditLabel(idx) {
+  const btn = document.querySelector(`button[data-vedit="${idx}"]`);
+  const n = state.outputs[idx]?.vLayers?.length || 0;
+  if (btn) btn.textContent = n ? `Blur & Overlays (${n})` : "Blur & Overlays";
+}
 function vedSeek(t) {
   return new Promise(resolve => {
     const v = ved.video;
@@ -56,7 +79,18 @@ function drawVEditor() {
   const u = 1 / ved.k, W = cv.width, H = cv.height;
   if (!ved.baseCv) ved.baseCv = Object.assign(document.createElement("canvas"), { width: W, height: H });
   ved.baseCv.width = W; ved.baseCv.height = H;
-  ved.baseCv.getContext("2d").drawImage(v, 0, 0, W, H);
+  const bctx = ved.baseCv.getContext("2d");
+  if (ved.frame && v.videoWidth && v.videoHeight) {
+    const sw = v.videoWidth, sh = v.videoHeight, half = H / 2;
+    const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
+    if (ved.frame.fit) { bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H); }
+    [[ved.frame.a, 0], [ved.frame.b, half]].forEach(([box, dy]) => {
+      const m = mapBox(px(box), W, half, ved.frame.fit);
+      bctx.drawImage(v, m.sx, m.sy, m.sw, m.sh, m.dx, dy + m.dy, m.dw, m.dh);
+    });
+  } else {
+    bctx.drawImage(v, 0, 0, W, H);
+  }
   ctx.drawImage(ved.baseCv, 0, 0, W, H);
   drawVerticalLayers(ctx, ved.baseCv, W, H, ved.layers);
 
@@ -70,13 +104,11 @@ function drawVEditor() {
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
     if (!on) return;
-    for (const [hx, hy] of VED_HANDLES) {
-      const rad = (hx && hy ? 8 : 6.5) * u;
-      const cx = clamp(x + (hx + 1) * w / 2, rad + u, W - rad - u);
-      const cy = clamp(y + (hy + 1) * h / 2, rad + u, H - rad - u);
-      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.fillStyle = color; ctx.fill();
-      ctx.lineWidth = 2 * u; ctx.strokeStyle = "#fff"; ctx.stroke();
-    }
+    const rad = 9 * u;
+    const cx = clamp(x + w, rad + u, W - rad - u);
+    const cy = clamp(y + h, rad + u, H - rad - u);
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.fillStyle = color; ctx.fill();
+    ctx.lineWidth = 2 * u; ctx.strokeStyle = "#fff"; ctx.stroke();
   });
 }
 function vedSyncControls() {
@@ -90,6 +122,22 @@ function vedSyncControls() {
     $("#ved-amount").value = l.amount;
     $("#ved-amount-val").textContent = l.amount;
   }
+}
+function vedCheckedIndices() {
+  return [...document.querySelectorAll('#ved-clips input[type="checkbox"]:checked')].map(el => Number(el.value));
+}
+function vedSyncClipsBtn() {
+  const n = vedCheckedIndices().length;
+  $("#ved-save").disabled = n === 0;
+  $("#ved-render").disabled = n === 0;
+  $("#ved-save").textContent = n <= 1 ? "Save edits" : `Save to ${n} clips`;
+  $("#ved-render").textContent = n <= 1 ? "Save & make vertical" : `Make ${n} clips vertical`;
+}
+function vedRenderClips(activeIndex) {
+  $("#ved-clips").innerHTML = state.outputs.map((item, idx) =>
+    `<label class="ed-clip-opt"><input type="checkbox" value="${idx}"${idx === activeIndex ? " checked" : ""}><span>${idx + 1}. ${escapeHTML(item.title)}</span></label>`
+  ).join("");
+  vedSyncClipsBtn();
 }
 function vedRenderOverlayList() {
   const saved = loadSavedOverlays();
@@ -123,35 +171,48 @@ function vedAddImageOverlay(id) {
   };
   img.src = ov.url;
 }
-async function openVerticalEditor(i) {
+async function openVerticalEditor(i, opts = {}) {
   if (!IS_ANDROID_APP) {
     toast("Download the Android app for this feature.", true);
+    $("#status").textContent = "Download the Android app to use the Vertical Maker.";
+    $("#app-note")?.scrollIntoView({ behavior: "smooth", block: "center" });
     return;
   }
   const item = state.outputs[i];
-  if (!item?.vUrl || state.busy) return;
-  const v = ved.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.vUrl });
+  if (!item?.url || state.busy) return;
+  const v = ved.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.url });
   try {
     await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
     ved.index = i;
-    ved.layers = [];
-    ved.sel = -1;
+    ved.frame = clone(opts.frame || item.vFrame || state.lastFrame || defaultFrame());
+    ved.returnToEditor = !!opts.returnToEditor;
+    ved.layers = await preloadLayerImages(cloneLayers(item.vLayers));
+    ved.sel = ved.layers.length ? 0 : -1;
     const slider = $("#ved-time");
-    slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(2, (v.duration || 1) / 2);
-    $("#ved-title").textContent = `Edit vertical: ${item.title}`;
+    slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
+    $("#ved-title").textContent = `Blur & Overlays: ${item.title}`;
     const cv = $("#ved-canvas");
     cv.width = 540; cv.height = 960;
     $("#ved-stage").style.maxWidth = "calc(50dvh * 0.5625)";
     vedRenderOverlayList();
+    vedRenderClips(i);
     vedSyncControls();
     $("#veditor").hidden = false;
     $("#veditor").scrollTop = 0;
     document.body.style.overflow = "hidden";
     await vedSeek(Number(slider.value));
     drawVEditor();
-  } catch { toast("Could not open this vertical clip for editing.", true); }
+  } catch { toast("Could not open this clip for editing.", true); }
 }
-const closeVerticalEditor = () => { $("#veditor").hidden = true; ved.drag = null; document.body.style.overflow = ""; };
+function closeVerticalEditor(reopenFraming = false) {
+  $("#veditor").hidden = true;
+  ved.drag = null;
+  document.body.style.overflow = "";
+  const back = reopenFraming && ved.returnToEditor;
+  const idx = ved.index;
+  ved.returnToEditor = false;
+  if (back) openEditor(idx);
+}
 
 function vedPos(e) {
   const cv = $("#ved-canvas"), b = cv.getBoundingClientRect();
@@ -161,17 +222,14 @@ function vedPos(e) {
 function vedHit(p) {
   const cv = $("#ved-canvas"), W = cv.width, H = cv.height;
   const px = { x: p.x * W, y: p.y * H };
-  const r0 = 24 / ved.k;
+  const r0 = 26 / ved.k;
   if (ved.sel >= 0 && ved.layers[ved.sel]) {
     const l = ved.layers[ved.sel];
     const ax = l.x * W, ay = l.y * H, aw = l.w * W, ah = l.h * H;
-    let best = null;
-    for (const [hx, hy] of VED_HANDLES) {
-      const cx = clamp(ax + (hx + 1) * aw / 2, 10, W - 10), cy = clamp(ay + (hy + 1) * ah / 2, 10, H - 10);
-      const d = Math.hypot(px.x - cx, px.y - cy);
-      if (d <= r0 && (!best || d < best.d)) best = { d, hx, hy };
+    const cx = clamp(ax + aw, 10, W - 10), cy = clamp(ay + ah, 10, H - 10);
+    if (Math.hypot(px.x - cx, px.y - cy) <= r0) {
+      return { idx: ved.sel, mode: "resize", hx: VED_HANDLE[0], hy: VED_HANDLE[1], ox: p.x - (l.x + l.w), oy: p.y - (l.y + l.h) };
     }
-    if (best) return { idx: ved.sel, mode: "resize", hx: best.hx, hy: best.hy, ox: best.hx ? p.x - (best.hx < 0 ? l.x : l.x + l.w) : 0, oy: best.hy ? p.y - (best.hy < 0 ? l.y : l.y + l.h) : 0 };
   }
   for (let idx = ved.layers.length - 1; idx >= 0; idx--) {
     const l = ved.layers[idx];
@@ -201,69 +259,33 @@ vedCanvas.addEventListener("pointermove", e => {
     l.y = clamp(p.y - d.dy, 0, 1 - l.h);
   } else {
     const minW = 0.06, minH = 0.035;
-    let L = l.x, T = l.y, R = l.x + l.w, B = l.y + l.h;
-    if (d.hx < 0) L = clamp(p.x - d.ox, 0, R - minW); else if (d.hx > 0) R = clamp(p.x - d.ox, L + minW, 1);
-    if (d.hy < 0) T = clamp(p.y - d.oy, 0, B - minH); else if (d.hy > 0) B = clamp(p.y - d.oy, T + minH, 1);
+    let L = l.x, T = l.y;
+    let R = clamp(p.x - d.ox, L + minW, 1);
+    let B = clamp(p.y - d.oy, T + minH, 1);
     if (l.kind === "image" && l.aspect) {
-      const nw = R - L, nh = (nw * (9 / 16)) / l.aspect;
-      if (T + nh <= 1) { B = T + nh; }
+      let nw = R - L;
+      let nh = (nw * (9 / 16)) / l.aspect;
+      if (T + nh > 1) {
+        nh = 1 - T;
+        nw = (nh * l.aspect) / (9 / 16);
+        R = L + nw;
+      }
+      B = T + nh;
     }
-    l.x = L; l.y = T; l.w = R - L; l.h = B - T;
+    l.w = R - L; l.h = B - T;
   }
   drawVEditor();
 });
 ["pointerup", "pointercancel"].forEach(t => vedCanvas.addEventListener(t, () => { ved.drag = null; }));
 
-async function exportEditedVertical(i, layers) {
-  const item = state.outputs[i];
-  const mb = await getMediabunny();
-  if (!mb) throw new Error("Hardware video editor is unavailable on this device.");
-  const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
-  const W = 1080, H = 1920;
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.vBlob) });
-  const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-  let canvas = null, ctx = null, baseCv = null, baseCtx = null;
-  try {
-    const conversion = await Conversion.init({
-      input,
-      output,
-      video: {
-        codec: "avc",
-        bitrate: 5_000_000,
-        hardwareAcceleration: "prefer-hardware",
-        processedWidth: W,
-        processedHeight: H,
-        process: (sample) => {
-          if (!ctx) {
-            canvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
-            ctx = canvas.getContext("2d", { alpha: false });
-            baseCv = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
-            baseCtx = baseCv.getContext("2d", { alpha: false });
-          }
-          sample.draw(baseCtx, 0, 0, W, H);
-          ctx.drawImage(baseCv, 0, 0, W, H);
-          drawVerticalLayers(ctx, baseCv, W, H, layers);
-          return canvas;
-        },
-      },
-    });
-    if (!conversion.isValid) throw new Error("Could not initialize vertical export.");
-    conversion.onProgress = p => setBar(p);
-    state.activeConversion = conversion;
-    await conversion.execute();
-    const vBlob = new Blob([output.target.buffer], { type: "video/mp4" });
-    if (item.vUrl) URL.revokeObjectURL(item.vUrl);
-    item.vBlob = vBlob;
-    item.vUrl = URL.createObjectURL(vBlob);
-    const box = $(`#vbox-${i}`);
-    const vid = box.querySelector("video");
-    const dl = box.querySelector("a[download]");
-    if (vid) vid.src = item.vUrl;
-    if (dl) dl.href = item.vUrl;
-  } finally {
-    state.activeConversion = null;
-    try { input.dispose?.(); } catch {}
-  }
+function applyLayersToIndices(indices, layers) {
+  const clean = cloneLayers(layers);
+  indices.forEach(idx => {
+    const item = state.outputs[idx];
+    if (!item) return;
+    item.vLayers = cloneLayers(clean);
+    refreshClipVEditLabel(idx);
+  });
 }
 
 $("#ved-time").addEventListener("input", async e => { await vedSeek(Number(e.target.value)); drawVEditor(); });
@@ -312,12 +334,34 @@ $("#ved-ov-list").addEventListener("click", e => {
   const pick = e.target.closest("[data-ov-add]");
   if (pick) vedAddImageOverlay(pick.dataset.ovAdd);
 });
-$("#ved-cancel").addEventListener("click", closeVerticalEditor);
-$("#ved-save").addEventListener("click", () => {
-  if (!ved.layers.length) return closeVerticalEditor();
-  const i = ved.index, layers = ved.layers.map(l => ({ ...l }));
-  closeVerticalEditor();
-  state.clipTotal = 1;
-  runTask(() => exportEditedVertical(i, layers), "Rendering vertical edits...");
+$("#ved-clips").addEventListener("change", vedSyncClipsBtn);
+$("#ved-pick-all").addEventListener("click", () => {
+  const boxes = [...document.querySelectorAll('#ved-clips input[type="checkbox"]')];
+  const allOn = boxes.every(b => b.checked);
+  boxes.forEach(b => { b.checked = !allOn; });
+  vedSyncClipsBtn();
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#veditor").hidden) closeVerticalEditor(); });
+$("#ved-apply-all").addEventListener("click", () => {
+  const all = state.outputs.map((_, idx) => idx);
+  applyLayersToIndices(all, ved.layers);
+  document.querySelectorAll('#ved-clips input[type="checkbox"]').forEach(b => { b.checked = true; });
+  vedSyncClipsBtn();
+  toast(`Applied edits to all ${all.length} clips.`);
+});
+$("#ved-cancel").addEventListener("click", () => closeVerticalEditor(true));
+$("#ved-save").addEventListener("click", () => {
+  const list = vedCheckedIndices();
+  if (!list.length) return;
+  applyLayersToIndices(list, ved.layers);
+  toast(`Saved edits to ${list.length} clip${list.length === 1 ? "" : "s"}.`);
+  closeVerticalEditor(true);
+});
+$("#ved-render").addEventListener("click", () => {
+  const list = vedCheckedIndices();
+  if (!list.length) return;
+  applyLayersToIndices(list, ved.layers);
+  const frame = clone(ved.frame);
+  closeVerticalEditor(false);
+  runTask(() => makeVerticalBatch(list, frame), "Preparing...");
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#veditor").hidden) closeVerticalEditor(true); });

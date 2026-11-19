@@ -3,7 +3,7 @@
    - Other own static files (icons, vendor/ffmpeg wrappers): stale-while-revalidate.
    - The ~31 MB ffmpeg core and mediabunny from the CDN: cached after the first download, so later cutting works offline.
    - Never touches /api/*, /__native_clip__/*, .zip downloads, non-GET requests, or anything else cross-origin (YouTube, etc). */
-const VERSION = "clipper-v1.11.21";
+const VERSION = "clipper-v1.11.22";
 const SHELL = `${VERSION}-shell`;
 const CORE = "clipper-ffmpeg-core-0.12.6"; // not tied to the app version: the engine rarely changes
 const PRECACHE = [
@@ -26,36 +26,31 @@ const isCore = url => /^(cdn\.jsdelivr\.net|unpkg\.com)$/.test(url.hostname) && 
 
 self.addEventListener("fetch", event => {
   const req = event.request, url = new URL(req.url);
-  if (req.method !== "GET" || req.headers.has("range")) return;
-
-  if (isCore(url)) { event.respondWith(coreFirst(req)); return; }
-  if (url.origin !== location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/__native_clip__/") || url.pathname.endsWith(".zip")) return;
-
-  if (req.mode === "navigate") { event.respondWith(networkFirst(req, "/")); return; }
-  if (url.pathname === "/sw.js") return;
-  if (url.pathname.startsWith("/js/") || url.pathname.startsWith("/css/")) { event.respondWith(networkFirst(req, req)); return; }
-  event.respondWith(staleWhileRevalidate(req));
+  if (req.method !== "GET" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/__native_clip__/") || url.pathname.endsWith(".zip")) return;
+  if (isCore(url)) {
+    event.respondWith(caches.open(CORE).then(c => c.match(req).then(hit => hit || fetch(req).then(res => {
+      if (res.ok) c.put(req, res.clone());
+      return res;
+    }))));
+    return;
+  }
+  if (url.origin !== location.origin) return;
+  const fresh = req.mode === "navigate" || url.pathname.endsWith(".js") || url.pathname.endsWith(".css");
+  event.respondWith(fresh ? networkFirst(req) : staleWhileRevalidate(req));
 });
 
-async function networkFirst(req, key) {
+async function networkFirst(req) {
   const cache = await caches.open(SHELL);
   try {
     const res = await fetch(req);
-    if (res.ok) cache.put(key, res.clone());
+    if (res.ok) cache.put(req, res.clone());
     return res;
   } catch {
-    return (await cache.match(key)) || new Response("You are offline and this file was not saved yet.", { status: 503, headers: { "Content-Type": "text/plain" } });
+    return (await cache.match(req)) || (req.mode === "navigate" ? cache.match("/") : Response.error());
   }
 }
 async function staleWhileRevalidate(req) {
   const cache = await caches.open(SHELL), hit = await cache.match(req);
-  const fresh = fetch(req).then(res => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
-  return hit || (await fresh) || new Response("", { status: 504 });
-}
-async function coreFirst(req) {
-  const cache = await caches.open(CORE), hit = await cache.match(req);
-  if (hit) return hit;
-  const res = await fetch(req);
-  if (res.ok && res.status === 200) cache.put(req, res.clone());
-  return res;
+  const net = fetch(req).then(res => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
+  return hit || (await net) || Response.error();
 }
