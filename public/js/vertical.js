@@ -122,7 +122,7 @@ async function makeVertical(ff, i, frame, onProgress) {
   item.vName = item.name.replace(/\.mp4$/, "") + "-vertical.mp4";
   const box = $(`#vbox-${i}`);
   box.hidden = false;
-  box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a></div>`;
+  box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a><button class="btn" data-vedit="${i}" type="button">Edit / Blur &amp; Overlays</button></div>`;
   const btn = document.querySelector(`button[data-vert="${i}"]`);
   if (btn) btn.textContent = "Redo vertical";
   updateResultsHeader();
