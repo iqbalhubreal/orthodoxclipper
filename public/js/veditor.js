@@ -1,6 +1,6 @@
 "use strict";
-/* Vertical Editor: blur rectangles (uniform edge-padded blur up to 80, excluded from alignment), image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts. */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null };
+/* Vertical Editor: feathered blur boxes that blend smoothly into the background, image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts. */
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, blurOutCv: null, maskCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -48,6 +48,25 @@ function ensureCanvas(cur, w, h) {
   cur.width = w; cur.height = h;
   return cur;
 }
+function applyFeatherMask(outCtx, rw, rh) {
+  const feather = Math.max(6, Math.round(Math.min(rw, rh) * 0.16));
+  ved.maskCv = ensureCanvas(ved.maskCv, rw, rh);
+  const mctx = ved.maskCv.getContext("2d");
+  mctx.clearRect(0, 0, rw, rh);
+  mctx.filter = `blur(${feather}px)`;
+  mctx.fillStyle = "#fff";
+  const iw = Math.max(2, rw - feather * 2), ih = Math.max(2, rh - feather * 2);
+  const ix = (rw - iw) / 2, iy = (rh - ih) / 2;
+  mctx.beginPath();
+  if (mctx.roundRect) mctx.roundRect(ix, iy, iw, ih, Math.round(feather * 0.6));
+  else mctx.rect(ix, iy, iw, ih);
+  mctx.fill();
+  mctx.filter = "none";
+  outCtx.save();
+  outCtx.globalCompositeOperation = "destination-in";
+  outCtx.drawImage(ved.maskCv, 0, 0);
+  outCtx.restore();
+}
 function drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, blurPx, frosted) {
   const pad = Math.min(220, Math.max(16, Math.ceil(blurPx * 2)));
   const bw = rw + pad * 2, bh = rh + pad * 2;
@@ -66,18 +85,18 @@ function drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, blurPx, frosted) 
   if (dy > 0) bctx.drawImage(ved.blurCv, 0, dy, bw, 1, 0, 0, bw, dy);
   if (dy + sh < bh) bctx.drawImage(ved.blurCv, 0, dy + sh - 1, bw, 1, 0, dy + sh, bw, bh - (dy + sh));
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(rx, ry, rw, rh);
-  ctx.clip();
-  ctx.filter = `blur(${blurPx}px)`;
-  ctx.drawImage(ved.blurCv, 0, 0, bw, bh, rx - pad, ry - pad, bw, bh);
-  ctx.filter = "none";
+  ved.blurOutCv = ensureCanvas(ved.blurOutCv, rw, rh);
+  const octx = ved.blurOutCv.getContext("2d");
+  octx.clearRect(0, 0, rw, rh);
+  octx.filter = `blur(${blurPx}px)`;
+  octx.drawImage(ved.blurCv, pad, pad, rw, rh, 0, 0, rw, rh);
+  octx.filter = "none";
   if (frosted) {
-    ctx.fillStyle = "rgba(15, 16, 24, 0.30)";
-    ctx.fillRect(rx, ry, rw, rh);
+    octx.fillStyle = "rgba(15, 16, 24, 0.24)";
+    octx.fillRect(0, 0, rw, rh);
   }
-  ctx.restore();
+  applyFeatherMask(octx, rw, rh);
+  ctx.drawImage(ved.blurOutCv, rx, ry);
 }
 function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
   const font = VED_FONTS.find(f => f.id === l.fontId) || VED_FONTS[0];
@@ -134,10 +153,13 @@ function drawVerticalLayers(ctx, baseCv, W, H, layers) {
         const pw = Math.max(1, Math.round(rw / block)), ph = Math.max(1, Math.round(rh / block));
         ved.pixCv = ensureCanvas(ved.pixCv, pw, ph);
         ved.pixCv.getContext("2d").drawImage(baseCv, rx, ry, rw, rh, 0, 0, pw, ph);
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(ved.pixCv, 0, 0, pw, ph, rx, ry, rw, rh);
-        ctx.restore();
+        ved.blurOutCv = ensureCanvas(ved.blurOutCv, rw, rh);
+        const octx = ved.blurOutCv.getContext("2d");
+        octx.clearRect(0, 0, rw, rh);
+        octx.imageSmoothingEnabled = false;
+        octx.drawImage(ved.pixCv, 0, 0, pw, ph, 0, 0, rw, rh);
+        applyFeatherMask(octx, rw, rh);
+        ctx.drawImage(ved.blurOutCv, rx, ry);
       } else {
         drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, Math.max(1, Math.round(l.amount * s)), l.blurType === "frosted");
       }

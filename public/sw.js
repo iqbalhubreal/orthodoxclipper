@@ -3,7 +3,7 @@
    - Other own static files (icons, vendor/ffmpeg wrappers): stale-while-revalidate.
    - The ~31 MB ffmpeg core and mediabunny from the CDN: cached after the first download, so later cutting works offline.
    - Never touches /api/*, /__native_clip__/*, .zip downloads, non-GET requests, or anything else cross-origin (YouTube, etc). */
-const VERSION = "clipper-v1.11.29";
+const VERSION = "clipper-v1.11.30";
 const SHELL = `${VERSION}-shell`;
 const CORE = "clipper-ffmpeg-core-0.12.6"; // not tied to the app version: the engine rarely changes
 const PRECACHE = [
