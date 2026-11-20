@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function: POST /api/highlights
  * Accepts creator-supplied timestamp ranges and notes, then asks Gemini to
- * write one short, direct, debate-sparking caption (6-10 words), #TheOrthodoxMuslim, three topic hashtags, @MuslimOrthodoxy, and @theorthodoxmuslim for each range. Video stays local.
+ * write one short, direct, debate-sparking caption (6-10 words), #TheOrthodoxMuslim, three topic hashtags, @MuslimOrthodoxy, and @orthodoxmuslim for each range. Video stays local.
  */
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
@@ -10,7 +10,7 @@ const ALLOWED_MODELS = new Set(["gemini-3.1-flash-lite", "gemini-3.5-flash", "ge
 const RETRYABLE = new Set([400, 404, 429, 500, 502, 503, 504]);
 const REQUIRED_TAG = "TheOrthodoxMuslim";
 const REQUIRED_MENTION_1 = "@MuslimOrthodoxy";
-const REQUIRED_MENTION_2 = "@theorthodoxmuslim";
+const REQUIRED_MENTION_2 = "@orthodoxmuslim";
 const BLOCKED_TAGS = /inter.?faith|inter.?relig|coexist|religious.?unity|religious.?harmony|anti.?muslim|anti.?islam|anti.?christian|anti.?hindu|muslim.?hate|christian.?hate|islam.?hate|hindu.?hate|ex.?muslim|ex.?christian|hate.?group|(?:muslim|islam|christian|christianity|hindu|judaism|jewish).{0,12}(?:hate|lies|liar|fraud|attack|destroy|exposed)|(?:hate|lies|liar|fraud|attack|destroy).{0,12}(?:muslim|islam|christian|christianity|hindu|judaism|jewish)/i;
 const BLOCKED_CAPTION = /inter.?faith|inter.?religious|coexistence between religions|unity between religions|harmony between religions/i;
 
@@ -171,7 +171,7 @@ function normalizeTags(raw, note) {
   const input = Array.isArray(raw) ? raw : [];
   for (const value of input) {
     let tag = String(value || "").trim().replace(/^[#@]+/, "").replace(/[^a-zA-Z0-9_]/g, "");
-    if (!tag || tag.toLowerCase() === "muslimorthodoxy" || tag.toLowerCase() === REQUIRED_TAG.toLowerCase() || BLOCKED_TAGS.test(tag)) continue;
+    if (!tag || tag.toLowerCase() === "muslimorthodoxy" || tag.toLowerCase() === "orthodoxmuslim" || tag.toLowerCase() === REQUIRED_TAG.toLowerCase() || BLOCKED_TAGS.test(tag)) continue;
     if (!tags.some(existing => existing.toLowerCase() === tag.toLowerCase())) tags.push(tag);
     if (tags.length === 3) break;
   }
