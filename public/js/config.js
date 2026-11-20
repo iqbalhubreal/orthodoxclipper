@@ -16,7 +16,8 @@ const ENGINE_STALL_MS = 30000;
 const FAST_CUT_TIMEOUT_MS = 120000;
 const PAD = 2; // seconds added before and after every clip, to avoid cutting too tight
 const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform));
-const IS_ANDROID_APP = !!window.AndroidClipper || new URLSearchParams(location.search).get("app") === "android";
+const IS_DESKTOP_APP = !!window.OrthodoxDesktop;
+const IS_ANDROID_APP = !!window.AndroidClipper || IS_DESKTOP_APP || new URLSearchParams(location.search).get("app") === "android";
 const TIME = "\\d{1,3}:\\d{2}(?::\\d{2})?";
 const SEP = "\\s*(?:-->|->|→|-|–|—|to|until)\\s*";
 const RANGE_RE = new RegExp(`(${TIME})${SEP}(${TIME})`, "i");
