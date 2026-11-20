@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical Editor: feathered blur boxes that blend smoothly into the background, image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts. */
+/* Vertical Editor: blur boxes with full-strength middle (90%+) and soft 5% edge blending, image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts. */
 const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, blurOutCv: null, maskCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null };
 
 const VED_FONTS = [
@@ -49,19 +49,16 @@ function ensureCanvas(cur, w, h) {
   return cur;
 }
 function applyFeatherMask(outCtx, rw, rh) {
-  const feather = Math.max(6, Math.round(Math.min(rw, rh) * 0.16));
+  const edge = Math.max(3, Math.round(Math.min(rw, rh) * 0.05));
+  const blurR = Math.max(2, Math.round(edge * 0.5));
   ved.maskCv = ensureCanvas(ved.maskCv, rw, rh);
   const mctx = ved.maskCv.getContext("2d");
   mctx.clearRect(0, 0, rw, rh);
-  mctx.filter = `blur(${feather}px)`;
   mctx.fillStyle = "#fff";
-  const iw = Math.max(2, rw - feather * 2), ih = Math.max(2, rh - feather * 2);
-  const ix = (rw - iw) / 2, iy = (rh - ih) / 2;
-  mctx.beginPath();
-  if (mctx.roundRect) mctx.roundRect(ix, iy, iw, ih, Math.round(feather * 0.6));
-  else mctx.rect(ix, iy, iw, ih);
-  mctx.fill();
+  mctx.filter = `blur(${blurR}px)`;
+  mctx.fillRect(blurR, blurR, Math.max(2, rw - blurR * 2), Math.max(2, rh - blurR * 2));
   mctx.filter = "none";
+  mctx.fillRect(edge, edge, Math.max(1, rw - edge * 2), Math.max(1, rh - edge * 2));
   outCtx.save();
   outCtx.globalCompositeOperation = "destination-in";
   outCtx.drawImage(ved.maskCv, 0, 0);
@@ -92,7 +89,7 @@ function drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, blurPx, frosted) 
   octx.drawImage(ved.blurCv, pad, pad, rw, rh, 0, 0, rw, rh);
   octx.filter = "none";
   if (frosted) {
-    octx.fillStyle = "rgba(15, 16, 24, 0.24)";
+    octx.fillStyle = "rgba(15, 16, 24, 0.30)";
     octx.fillRect(0, 0, rw, rh);
   }
   applyFeatherMask(octx, rw, rh);
