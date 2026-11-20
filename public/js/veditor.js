@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical Editor: blur boxes with full-strength middle (90%+) and soft 5% edge blending, image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts. */
+/* Vertical Editor: blur boxes with adjustable solid middle (40-100%, default 90%) and edge blending, image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts. */
 const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, blurOutCv: null, maskCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null };
 
 const VED_FONTS = [
@@ -17,7 +17,7 @@ const VED_COLORS = ["#ffffff", "#000000", "#f0b35a", "#8b79ff", "#42c98b", "#ff5
 function cloneLayers(layers) {
   return (layers || []).map(l => {
     const copy = { kind: l.kind, x: l.x, y: l.y, w: l.w, h: l.h };
-    if (l.kind === "blur") { copy.blurType = l.blurType; copy.amount = l.amount; }
+    if (l.kind === "blur") { copy.blurType = l.blurType; copy.amount = l.amount; copy.solidPct = l.solidPct ?? 90; }
     else if (l.kind === "text") { copy.text = l.text; copy.fontId = l.fontId; copy.fontSize = l.fontSize; copy.color = l.color; copy.bg = l.bg; }
     else { copy.name = l.name; copy.url = l.url; copy.aspect = l.aspect; }
     return copy;
@@ -48,8 +48,11 @@ function ensureCanvas(cur, w, h) {
   cur.width = w; cur.height = h;
   return cur;
 }
-function applyFeatherMask(outCtx, rw, rh) {
-  const edge = Math.max(3, Math.round(Math.min(rw, rh) * 0.05));
+function applyFeatherMask(outCtx, rw, rh, solidPct) {
+  const pct = clamp(Number(solidPct ?? 90), 40, 100);
+  if (pct >= 100) return;
+  const edgeFrac = (100 - pct) / 200;
+  const edge = Math.max(2, Math.round(Math.min(rw, rh) * edgeFrac));
   const blurR = Math.max(2, Math.round(edge * 0.5));
   ved.maskCv = ensureCanvas(ved.maskCv, rw, rh);
   const mctx = ved.maskCv.getContext("2d");
@@ -64,7 +67,7 @@ function applyFeatherMask(outCtx, rw, rh) {
   outCtx.drawImage(ved.maskCv, 0, 0);
   outCtx.restore();
 }
-function drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, blurPx, frosted) {
+function drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, blurPx, frosted, solidPct) {
   const pad = Math.min(220, Math.max(16, Math.ceil(blurPx * 2)));
   const bw = rw + pad * 2, bh = rh + pad * 2;
   ved.blurCv = ensureCanvas(ved.blurCv, bw, bh);
@@ -92,7 +95,7 @@ function drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, blurPx, frosted) 
     octx.fillStyle = "rgba(15, 16, 24, 0.30)";
     octx.fillRect(0, 0, rw, rh);
   }
-  applyFeatherMask(octx, rw, rh);
+  applyFeatherMask(octx, rw, rh, solidPct);
   ctx.drawImage(ved.blurOutCv, rx, ry);
 }
 function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
@@ -155,10 +158,10 @@ function drawVerticalLayers(ctx, baseCv, W, H, layers) {
         octx.clearRect(0, 0, rw, rh);
         octx.imageSmoothingEnabled = false;
         octx.drawImage(ved.pixCv, 0, 0, pw, ph, 0, 0, rw, rh);
-        applyFeatherMask(octx, rw, rh);
+        applyFeatherMask(octx, rw, rh, l.solidPct);
         ctx.drawImage(ved.blurOutCv, rx, ry);
       } else {
-        drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, Math.max(1, Math.round(l.amount * s)), l.blurType === "frosted");
+        drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, Math.max(1, Math.round(l.amount * s)), l.blurType === "frosted", l.solidPct);
       }
     } else if (l.kind === "image" && l.img) {
       ctx.drawImage(l.img, rx, ry, rw, rh);
@@ -232,6 +235,9 @@ function vedSyncControls() {
     document.querySelectorAll("#ved-btype button").forEach(b => b.classList.toggle("on", b.dataset.btype === l.blurType));
     $("#ved-amount").value = l.amount;
     $("#ved-amount-val").textContent = l.amount;
+    const solid = l.solidPct ?? 90;
+    $("#ved-solid").value = solid;
+    $("#ved-solid-val").textContent = solid;
   } else if (l.kind === "text" && ved.postVertical) {
     $("#ved-text-input").value = l.text || "";
     document.querySelectorAll("#ved-font-grid button").forEach(b => b.classList.toggle("on", b.dataset.font === l.fontId));
@@ -274,7 +280,7 @@ function vedRenderOverlayList() {
   $("#ved-import").disabled = saved.length >= MAX_SAVED_OVERLAYS;
 }
 function vedAddBlur() {
-  ved.layers.push({ kind: "blur", blurType: "smooth", amount: 18, x: 0.15, y: 0.43, w: 0.7, h: 0.14 });
+  ved.layers.push({ kind: "blur", blurType: "smooth", amount: 18, solidPct: 90, x: 0.15, y: 0.43, w: 0.7, h: 0.14 });
   ved.sel = ved.layers.length - 1;
   vedSyncControls();
   drawVEditor();
@@ -513,6 +519,13 @@ $("#ved-amount").addEventListener("input", e => {
   if (!l) return;
   l.amount = Number(e.target.value);
   $("#ved-amount-val").textContent = l.amount;
+  drawVEditor();
+});
+$("#ved-solid").addEventListener("input", e => {
+  const l = ved.layers[ved.sel];
+  if (!l || l.kind !== "blur") return;
+  l.solidPct = Number(e.target.value);
+  $("#ved-solid-val").textContent = l.solidPct;
   drawVEditor();
 });
 $("#ved-text-input").addEventListener("input", e => {
