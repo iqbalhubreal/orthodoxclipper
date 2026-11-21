@@ -113,15 +113,10 @@
       <div class="ed-tools">
         <div class="span-full">
           <p class="ed-cap">Stage style</p>
-          <div class="ed-seg ed-seg-grid" id="ed-stage-mode" role="group" aria-label="Stage style">
+          <div class="ed-seg" id="ed-stage-mode" role="group" aria-label="Stage style">
             <button type="button" data-style="classic" class="on">Classic</button>
             <button type="button" data-style="2.5d">2.5D Stage</button>
-            <button type="button" data-style="versus">Versus</button>
-            <button type="button" data-style="glass">Glass</button>
-            <button type="button" data-style="cinema">Cinema</button>
-            <button type="button" data-style="study">Study</button>
             <button type="button" data-style="pip">PiP</button>
-            <button type="button" data-style="broadcast">Broadcast</button>
           </div>
         </div>
         <div class="span-full"><p class="ed-cap">Box shape in video</p><div class="ed-seg" id="ed-fit" role="group" aria-label="Fill or fit"><button type="button" data-fit="fill" class="on">Fill</button><button type="button" data-fit="fit">Fit</button></div></div>
@@ -129,6 +124,7 @@
           <p class="ed-cap">Background preset</p>
           <div id="ed-stage-bg" class="stage-bg-grid"></div>
           <label class="stage-field"><span>Active speaker glow</span><select id="ed-stage-focus"><option value="auto">Auto (follow speaker)</option><option value="top">Top speaker</option><option value="bottom">Bottom speaker</option><option value="both">Both lit</option></select></label>
+          <label class="ed-time" style="margin-top:2px"><span>Frame size (<span id="ed-stage-scale-val">100</span>%)</span><input id="ed-stage-scale" type="range" min="70" max="115" value="100"></label>
           <div class="stage-toggles">
             <label class="stage-chk"><input id="ed-stage-wave" type="checkbox" checked><span>Waveform</span></label>
             <label class="stage-chk"><input id="ed-stage-glow" type="checkbox" checked><span>Glow</span></label>
@@ -138,12 +134,6 @@
             <label class="stage-chk"><input id="ed-stage-nameplates" type="checkbox"><span>Nameplates</span></label>
           </div>
           <div id="ed-names-wrap" class="stage-row-2" hidden></div>
-        </div>
-        <label class="stage-chk span-full" style="padding:2px 4px" title="Automatically trims dead silence from the start and end of each clip when making it vertical."><input id="ed-snip-silence" type="checkbox"><span>Snip leading/trailing silence</span></label>
-        <div class="ed-tpl span-full">
-          <p class="ed-cap">Templates (boxes, layout and stage)</p>
-          <div class="ed-tpl-row"><select id="ed-tpl-list" aria-label="Saved templates"></select><button id="ed-tpl-apply" class="btn ed-mini" type="button">Apply</button><button id="ed-tpl-save" class="btn ed-mini" type="button">Save current</button><button id="ed-tpl-del" class="btn ed-mini del" type="button">Delete</button></div>
-          <div id="ed-tpl-save-row" class="ed-tpl-row" style="margin-top:6px" hidden><input id="ed-tpl-name" type="text" maxlength="40" placeholder="Template name (e.g. 2-Cam Podcast)" autocomplete="off"><button id="ed-tpl-save-ok" class="btn ed-mini primary" type="button">Save</button><button id="ed-tpl-save-cancel" class="btn ed-mini" type="button">Cancel</button></div>
         </div>
         <div class="span-full">
           <div class="ed-clips-head"><p class="ed-cap">Cropping boxes (<span id="ed-box-count">2</span>/4)</p><div class="ed-box-btns"><button id="ed-add-box" class="btn ed-mini" type="button">+ Box</button><button id="ed-del-box" class="btn ed-mini del" type="button">- Box</button></div></div>
@@ -230,7 +220,6 @@
 <script defer src="/js/editor.js"></script>
 <script defer src="/js/veditor.js"></script>
 <script defer src="/js/preview.js"></script>
-<script defer src="/js/templates.js"></script>
 <script defer src="/js/theme.js"></script>
 <script defer src="/js/pwa.js"></script>
 <script defer src="/js/app.js"></script>
