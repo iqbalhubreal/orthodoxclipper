@@ -101,7 +101,7 @@
   <div class="ed-body">
     <div>
       <div class="ed-stage" id="ed-stage"><canvas id="ed-canvas"></canvas></div>
-      <label class="ed-time">Pick a moment in this clip<input id="ed-time" type="range"></label>
+      <label class="ed-time"><span>Pick a moment in this clip</span><input id="ed-time" type="range"></label>
       <div id="ed-layout-wrap" class="ed-layout-wrap" hidden>
         <p class="ed-cap">Layout</p>
         <div class="ed-seg ed-layout-seg" id="ed-layout" role="group" aria-label="Vertical layout"></div>
@@ -153,7 +153,7 @@
         <button id="ved-next-clip" class="btn ed-mini" type="button" aria-label="Next clip">›</button>
       </div>
       <div class="ed-stage" id="ved-stage"><canvas id="ved-canvas"></canvas></div>
-      <label class="ed-time">Scrub video<input id="ved-time" type="range"></label>
+      <label class="ed-time"><span>Scrub video</span><input id="ved-time" type="range"></label>
     </div>
     <div class="ved-tools">
       <div class="span-full">
@@ -170,12 +170,12 @@
         <div id="ved-blur-opts" hidden>
           <p class="ed-cap">Blur type</p>
           <div class="ed-seg" id="ved-btype"><button type="button" data-btype="smooth" class="on">Smooth</button><button type="button" data-btype="pixel">Pixel</button><button type="button" data-btype="frosted">Frosted</button></div>
-          <label class="ed-time" style="margin-top:8px">Intensity (<span id="ved-amount-val">18</span>)<input id="ved-amount" type="range" min="4" max="80" value="18"></label>
+          <label class="ed-time" style="margin-top:8px"><span>Intensity (<span id="ved-amount-val">18</span>)</span><input id="ved-amount" type="range" min="4" max="80" value="18"></label>
         </div>
         <div id="ved-text-opts" hidden>
           <p class="ed-cap">Text (tap box on video to drag)</p>
           <textarea id="ved-text-input" class="ved-text-input" rows="2" placeholder="Write text..."></textarea>
-          <label class="ed-time" style="margin-top:6px">Size (<span id="ved-fsize-val">32</span>px)<input id="ved-font-size" type="range" min="14" max="72" value="32"></label>
+          <label class="ed-time" style="margin-top:6px"><span>Size (<span id="ved-fsize-val">32</span>px)</span><input id="ved-font-size" type="range" min="14" max="72" value="32"></label>
           <p class="ed-cap" style="margin-top:8px">Readable Font</p>
           <div id="ved-font-grid" class="ved-font-grid"></div>
           <div class="ved-text-style">
