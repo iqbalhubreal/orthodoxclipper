@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text & hook boxes, clip switcher, and Applies-to-all / Individual toggle (text always stays individual). */
+/* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text & hook only in Individual mode). */
 const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, guides: null, showIgGuide: true, scope: "all" };
 
 const VED_FONTS = [
@@ -134,6 +134,18 @@ function drawVerticalLayers(ctx, baseCv, W, H, layers) {
     }
   }
 }
+function getClipHookText(idx) {
+  const item = state.outputs[idx];
+  return item?.vFrame?.stage?.hookText ?? (item?.hook || item?.caption || ved.frame?.stage?.hookText || "");
+}
+function setClipHookText(idx, text) {
+  const item = state.outputs[idx];
+  if (!item) return;
+  if (!item.vFrame) item.vFrame = clone(ved.frame || defaultFrame());
+  if (!item.vFrame.stage) item.vFrame.stage = defaultStageConfig(item);
+  item.vFrame.stage.hookText = text;
+  if (idx === ed.index && ed.frame?.stage) ed.frame.stage.hookText = text;
+}
 function drawVEditor() {
   const v = ved.video, cv = $("#ved-canvas"), ctx = cv.getContext("2d");
   if (!v || !cv) return;
@@ -145,9 +157,8 @@ function drawVEditor() {
     const boxes = getFrameBoxes(ved.frame), slots = getLayoutSlots(boxes.length, ved.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
     if (ved.frame.stage?.enabled && typeof drawStageComposition === "function") {
-      const item = state.outputs[ved.index];
       const clipFrame = clone(ved.frame);
-      clipFrame.stage.hookText = item?.vFrame?.stage?.hookText ?? (item?.hook || item?.caption || clipFrame.stage.hookText || "");
+      clipFrame.stage.hookText = getClipHookText(ved.index);
       drawStageComposition(bctx, v, sw, sh, boxes, clipFrame, W, H, {
         energy: 0.55,
         timestamp: Number($("#ved-time").value) || 0,
@@ -213,20 +224,23 @@ function vedSyncClipBar() {
 function vedSyncControls() {
   const isIndiv = ved.scope === "individual";
   $("#ved-add-text").hidden = !isIndiv;
-  $("#ved-add-hook").hidden = !isIndiv;
+  const showStageHook = isIndiv && !!ved.frame?.stage?.enabled;
+  $("#ved-stage-hook-card").hidden = !showStageHook;
+  if (showStageHook) $("#ved-stage-hook-input").value = getClipHookText(ved.index);
   document.querySelectorAll("#ved-scope button").forEach(b => b.classList.toggle("on", b.dataset.scope === ved.scope));
   vedSyncClipBar();
 
+  if (!isIndiv && ved.layers[ved.sel]?.kind === "text") ved.sel = -1;
   const l = ved.layers[ved.sel];
   $("#ved-layer-tools").hidden = !l;
   if (!l) return;
   $("#ved-blur-opts").hidden = l.kind !== "blur";
-  $("#ved-text-opts").hidden = l.kind !== "text";
+  $("#ved-text-opts").hidden = !(l.kind === "text" && isIndiv);
   if (l.kind === "blur") {
     document.querySelectorAll("#ved-btype button").forEach(b => b.classList.toggle("on", b.dataset.btype === l.blurType));
     $("#ved-amount").value = l.amount;
     $("#ved-amount-val").textContent = l.amount;
-  } else if (l.kind === "text") {
+  } else if (l.kind === "text" && isIndiv) {
     $("#ved-text-input").value = l.text || "";
     $("#ved-font-size").value = l.fontSize || 32;
     $("#ved-fsize-val").textContent = l.fontSize || 32;
@@ -260,7 +274,6 @@ function vedSaveLayersToState() {
     if (state.outputs[ved.index]) state.outputs[ved.index].vLayers = clean;
     return;
   }
-  // Applies to all: apply non-text layers (blur/image) to every clip, keeping every clip's text layers strictly individual
   const sharedNonText = clean.filter(l => l.kind !== "text");
   const curText = clean.filter(l => l.kind === "text");
   state.outputs.forEach((out, idx) => {
@@ -276,22 +289,20 @@ function vedAddBlur() {
   vedSyncControls();
   drawVEditor();
 }
-function vedAddText(isHook = false) {
+function vedAddText() {
   if (ved.scope !== "individual") return;
-  const item = state.outputs[ved.index];
-  const defaultHook = item?.hook || item?.caption || "Wait... What do you think?";
   ved.layers.push({
     kind: "text",
-    text: isHook ? defaultHook : "Your text",
-    fontId: isHook ? "headline" : "classic",
-    fontSize: isHook ? 26 : 32,
+    text: "Your text",
+    fontId: "classic",
+    fontSize: 32,
     color: "#ffffff",
-    bg: isHook ? "dark" : "none",
+    bg: "none",
     align: "center",
-    x: isHook ? 0.06 : 0.15,
-    y: isHook ? 0.04 : 0.44,
-    w: isHook ? 0.88 : 0.7,
-    h: isHook ? 0.13 : 0.12,
+    x: 0.15,
+    y: 0.44,
+    w: 0.7,
+    h: 0.12,
   });
   ved.sel = ved.layers.length - 1;
   vedSyncControls();
@@ -417,6 +428,7 @@ function vedHit(p) {
   }
   for (let idx = ved.layers.length - 1; idx >= 0; idx--) {
     const l = ved.layers[idx];
+    if (l.kind === "text" && ved.scope !== "individual") continue;
     if (p.x >= l.x && p.x <= l.x + l.w && p.y >= l.y && p.y <= l.y + l.h) {
       return { idx, mode: "move", dx: p.x - l.x, dy: p.y - l.y };
     }
@@ -468,11 +480,15 @@ $("#ved-scope")?.addEventListener("click", e => {
   if (!b) return;
   ved.scope = b.dataset.scope === "individual" ? "individual" : "all";
   vedSyncControls();
+  drawVEditor();
+});
+$("#ved-stage-hook-input")?.addEventListener("input", e => {
+  setClipHookText(ved.index, e.target.value);
+  drawVEditor();
 });
 $("#ved-ig-guide")?.addEventListener("change", e => { ved.showIgGuide = e.target.checked; drawVEditor(); });
 $("#ved-add-blur").addEventListener("click", vedAddBlur);
-$("#ved-add-text").addEventListener("click", () => vedAddText(false));
-$("#ved-add-hook")?.addEventListener("click", () => vedAddText(true));
+$("#ved-add-text").addEventListener("click", vedAddText);
 $("#ved-btype").addEventListener("click", e => {
   const b = e.target.closest("button[data-btype]");
   if (!b || !ved.layers[ved.sel]) return;

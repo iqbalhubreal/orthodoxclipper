@@ -160,7 +160,11 @@
         <p class="ed-cap">Editing mode (text always stays individual)</p>
         <div class="ed-seg" id="ved-scope" role="group" aria-label="Editing scope"><button type="button" data-scope="all" class="on">Applies to all</button><button type="button" data-scope="individual">Individual</button></div>
       </div>
-      <div class="ed-tool-row span-full"><button id="ved-add-blur" class="btn" type="button">+ Blur</button><button id="ved-add-text" class="btn" type="button" hidden>+ Text</button><button id="ved-add-hook" class="btn" type="button" hidden>+ Hook</button><button id="ved-import" class="btn" type="button">+ Image</button><input id="ved-file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden></div>
+      <div class="ed-tool-row span-full"><button id="ved-add-blur" class="btn" type="button">+ Blur</button><button id="ved-add-text" class="btn" type="button" hidden>+ Text</button><button id="ved-import" class="btn" type="button">+ Image</button><input id="ved-file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden></div>
+      <div id="ved-stage-hook-card" class="ved-card span-full" hidden>
+        <p class="ed-cap">Top debate hook (this clip only)</p>
+        <input id="ved-stage-hook-input" class="ved-hook-input" type="text" maxlength="140" placeholder="Enter debate hook for this clip...">
+      </div>
       <label class="stage-chk span-full" style="padding:2px 4px"><input id="ved-ig-guide" type="checkbox" checked><span>Show IG Edits AI Subtitles Safe Zone</span></label>
       <div id="ved-layer-tools" class="ved-card span-full" hidden>
         <div id="ved-blur-opts" hidden>
@@ -169,7 +173,7 @@
           <label class="ed-time" style="margin-top:8px">Intensity (<span id="ved-amount-val">18</span>)<input id="ved-amount" type="range" min="4" max="80" value="18"></label>
         </div>
         <div id="ved-text-opts" hidden>
-          <p class="ed-cap">Text (tap box on video to drag anywhere)</p>
+          <p class="ed-cap">Text (tap box on video to drag)</p>
           <textarea id="ved-text-input" class="ved-text-input" rows="2" placeholder="Write text..."></textarea>
           <label class="ed-time" style="margin-top:6px">Size (<span id="ved-fsize-val">32</span>px)<input id="ved-font-size" type="range" min="14" max="72" value="32"></label>
           <p class="ed-cap" style="margin-top:8px">Readable Font</p>
