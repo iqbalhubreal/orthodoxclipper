@@ -135,8 +135,11 @@
             <label class="stage-chk" title="Tracks faces and mouths to light up whoever is talking. Adds a little time when making the vertical video."><input id="ed-stage-detect" type="checkbox" checked><span>Detect speaker</span></label>
             <label class="stage-chk" title="Dashed guide for the empty top area. Preview only, never in the exported video."><input id="ed-stage-hookzone" type="checkbox" checked><span>IG Hook Zone</span></label>
             <label class="stage-chk"><input id="ed-stage-subzone" type="checkbox" checked><span>IG Subtitles Zone</span></label>
+            <label class="stage-chk"><input id="ed-stage-nameplates" type="checkbox"><span>Nameplates</span></label>
           </div>
+          <div id="ed-names-wrap" class="stage-row-2" hidden></div>
         </div>
+        <label class="stage-chk span-full" style="padding:2px 4px" title="Automatically trims dead silence from the start and end of each clip when making it vertical."><input id="ed-snip-silence" type="checkbox"><span>Snip leading/trailing silence</span></label>
         <div class="ed-tpl span-full">
           <p class="ed-cap">Templates (boxes, layout and stage)</p>
           <div class="ed-tpl-row"><select id="ed-tpl-list" aria-label="Saved templates"></select><button id="ed-tpl-apply" class="btn ed-mini" type="button">Apply</button><button id="ed-tpl-save" class="btn ed-mini" type="button">Save current</button><button id="ed-tpl-del" class="btn ed-mini del" type="button">Delete</button></div>

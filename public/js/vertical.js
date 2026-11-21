@@ -85,7 +85,7 @@ async function runTask(fn, message) {
     showBusy(false);
   }
 }
-async function makeVerticalWebCodecs(item, frame, onProgress) {
+async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, trim = null) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
@@ -94,9 +94,9 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
   const slots = getLayoutSlots(frameBoxes.length, frame.layout);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
   const stageEnabled = !!(frame.stage?.enabled && typeof drawStageComposition === "function");
-  const audioEnv = stageEnabled && (frame.stage.waveform || frame.stage.activeGlow)
+  const audioEnv = preEnv || (stageEnabled && (frame.stage.waveform || frame.stage.activeGlow)
     ? await extractAudioEnvelope(item.blob, FPS)
-    : null;
+    : null);
   // Optional: find who is really speaking (face tracking + audio), so the stage glow follows them.
   let speakerTrack = null;
   if (stageEnabled && typeof getSpeakerTrack === "function") {
@@ -107,7 +107,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
   let ctx = null, baseCv = null, baseCtx = null, boxes = null, sw = 0, sh = 0, frameCount = 0;
   try {
-    const conversion = await Conversion.init({
+    const convOpts = {
       input,
       output,
       video: {
@@ -166,7 +166,9 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
           return ctx.canvas;
         },
       },
-    });
+    };
+    if (trim) convOpts.trim = trim;
+    const conversion = await Conversion.init(convOpts);
     if (!conversion.isValid) return null;
     if (onProgress) conversion.onProgress = onProgress;
     state.activeConversion = conversion;
@@ -185,17 +187,21 @@ async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
   const clipFrame = clone(frame);
   item.vFrame = clone(clipFrame);
+  const needEnv = !!(clipFrame.snipSilence || (clipFrame.stage?.enabled && (clipFrame.stage.waveform || clipFrame.stage.activeGlow)));
+  const preEnv = needEnv && typeof extractAudioEnvelope === "function" ? (item._env || (item._env = await extractAudioEnvelope(item.blob, 30))) : null;
+  const trim = clipFrame.snipSilence && typeof detectSpeechBounds === "function" ? detectSpeechBounds(preEnv, 30) : null;
   const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled;
   let vBlob = useWebCodecs
-    ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress), state.cancelPromise])
+    ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress, preEnv, trim), state.cancelPromise])
     : null;
   if (!vBlob) {
     const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
     showBusy(true, state.progressMessage);
     const tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
     await engine.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
+    const trimArgs = trim ? ["-ss", trim.start.toFixed(3), "-to", trim.end.toFixed(3)] : [];
     const code = await Promise.race([engine.exec([
-      "-i", tmpIn, "-filter_complex", verticalFilter(clipFrame), "-map", "[v]", "-map", "0:a?",
+      ...trimArgs, "-i", tmpIn, "-filter_complex", verticalFilter(clipFrame), "-map", "[v]", "-map", "0:a?",
       "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut
     ]), state.cancelPromise]);
     if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);

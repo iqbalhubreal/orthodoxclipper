@@ -19,6 +19,8 @@ function defaultStageConfig(item = null) {
     activeGlow: true,
     subtitleSafeZone: true,
     hookGuide: true,
+    nameplates: false,
+    names: ["", "", "", ""],
     speakerFocus: "auto",
     detectSpeaker: !(typeof IS_MOBILE !== "undefined" && IS_MOBILE),
   };
@@ -38,6 +40,8 @@ function normalizeStageConfig(raw, item = null) {
     activeGlow: raw.activeGlow !== false,
     subtitleSafeZone: raw.subtitleSafeZone !== false,
     hookGuide: raw.hookGuide !== false,
+    nameplates: !!raw.nameplates,
+    names: Array.from({ length: 4 }, (_, i) => String(Array.isArray(raw.names) ? (raw.names[i] ?? "") : "").slice(0, 28)),
     speakerFocus: ["auto", "top", "bottom", "both"].includes(raw.speakerFocus) ? raw.speakerFocus : "auto",
     detectSpeaker: raw.detectSpeaker === undefined ? base.detectSpeaker : !!raw.detectSpeaker,
   };
@@ -364,6 +368,35 @@ function drawStageHookGuide(ctx, W, H) {
   ctx.restore();
 }
 
+function drawStageNameplate(ctx, rect, text, accent, isActive, s) {
+  const label = String(text || "").trim();
+  if (!label) return;
+  const padX = Math.round(14 * s);
+  const ph = Math.round(34 * s);
+  const margin = Math.round(16 * s);
+  const maxW = Math.max(40, rect.w - margin * 2);
+  ctx.save();
+  ctx.font = `600 ${Math.max(9, Math.round(20 * s))}px "Inter", system-ui, sans-serif`;
+  const tw = Math.min(maxW - padX * 2, ctx.measureText(label).width);
+  const pw = Math.min(maxW, Math.round(tw + padX * 2));
+  const px = rect.x + margin;
+  const py = rect.y + rect.h - margin - ph;
+  stageRoundRectPath(ctx, px, py, pw, ph, ph / 2);
+  ctx.fillStyle = "rgba(10, 14, 24, 0.80)";
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, 1.4 * s);
+  ctx.strokeStyle = isActive ? stageRgba(accent, 0.85) : "rgba(255, 255, 255, 0.22)";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.rect(px + padX / 2, py, pw - padX, ph);
+  ctx.clip();
+  ctx.fillStyle = "#f8fafc";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, px + padX, py + ph / 2 + s * 0.5);
+  ctx.restore();
+}
+
 function resolveActiveSpeaker(stage, count, timestamp, energy) {
   if (count <= 1) return 0;
   if (stage.speakerFocus === "top") return 0;
@@ -510,6 +543,9 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
       ctx.stroke();
     }
     ctx.restore();
+    if (stage.nameplates && stage.names && stage.names[idx]) {
+      drawStageNameplate(ctx, rect, stage.names[idx], cardAccent, L > 0.35, s);
+    }
   });
 
   if (stage.waveform && style !== "pip") {
@@ -547,4 +583,24 @@ async function extractAudioEnvelope(blob, fps = 30) {
   } catch {
     return null;
   }
+}
+
+function detectSpeechBounds(env, fps = 30) {
+  if (!env || !env.length) return null;
+  const totalSec = env.length / fps;
+  if (totalSec < 2.5) return null;
+  const th = 0.08;
+  let first = -1, last = -1;
+  for (let i = 0; i < env.length; i++) {
+    if (env[i] > th) { first = i; break; }
+  }
+  for (let i = env.length - 1; i >= 0; i--) {
+    if (env[i] > th) { last = i; break; }
+  }
+  if (first < 0 || last <= first) return null;
+  const start = Math.max(0, first / fps - 0.25);
+  const end = Math.min(totalSec, (last + 1) / fps + 0.25);
+  if (end - start < 2.0) return null;
+  if (start < 0.25 && totalSec - end < 0.25) return null;
+  return { start, end };
 }

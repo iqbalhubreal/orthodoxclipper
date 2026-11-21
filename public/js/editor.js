@@ -56,6 +56,22 @@ function edSyncUI() {
   $("#ed-stage-detect").disabled = st.activeGlow === false || (st.speakerFocus || "auto") !== "auto";
   $("#ed-stage-subzone").checked = st.subtitleSafeZone !== false;
   $("#ed-stage-hookzone").checked = st.hookGuide !== false;
+  $("#ed-stage-nameplates").checked = !!st.nameplates;
+  $("#ed-snip-silence").checked = !!ed.frame.snipSilence;
+  const namesWrap = $("#ed-names-wrap");
+  namesWrap.hidden = !st.nameplates;
+  if (st.nameplates) {
+    const curNames = Array.isArray(st.names) ? st.names : (st.names = ["", "", "", ""]);
+    if (namesWrap.childElementCount !== boxes.length) {
+      namesWrap.innerHTML = boxes.map((_, idx) =>
+        `<label class="stage-field"><span>${boxLabel(idx, boxes.length)} name</span><input type="text" data-name-idx="${idx}" maxlength="28" placeholder="Speaker ${idx + 1}"></label>`
+      ).join("");
+    }
+    namesWrap.querySelectorAll("input[data-name-idx]").forEach(inp => {
+      const idx = Number(inp.dataset.nameIdx);
+      if (document.activeElement !== inp) inp.value = curNames[idx] || "";
+    });
+  }
 }
 function edCheckedIndices() {
   return [...document.querySelectorAll('#ed-clips input[type="checkbox"]:checked')].map(el => Number(el.value));
@@ -97,7 +113,7 @@ async function openEditor(i) {
     ed.index = i; ed.sel = 0;
     const rawFrame = clone(item.vFrame || state.lastFrame || defaultFrame());
     const stage = typeof normalizeStageConfig === "function" ? normalizeStageConfig(rawFrame.stage, item) : { enabled: false };
-    ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame), stage };
+    ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", snipSilence: !!rawFrame.snipSilence, boxes: getFrameBoxes(rawFrame), stage };
     const slider = $("#ed-time");
     slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
     $("#ed-title").textContent = `Vertical Maker: ${item.title}`;
@@ -253,6 +269,15 @@ $("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow 
 $("#ed-stage-detect").addEventListener("change", e => { ed.frame.stage.detectSpeaker = e.target.checked; });
 $("#ed-stage-hookzone").addEventListener("change", e => { ed.frame.stage.hookGuide = e.target.checked; drawEditor(); });
 $("#ed-stage-subzone").addEventListener("change", e => { ed.frame.stage.subtitleSafeZone = e.target.checked; drawEditor(); });
+$("#ed-stage-nameplates").addEventListener("change", e => { ed.frame.stage.nameplates = e.target.checked; edSyncUI(); drawEditor(); });
+$("#ed-names-wrap").addEventListener("input", e => {
+  const inp = e.target.closest("input[data-name-idx]");
+  if (!inp) return;
+  if (!Array.isArray(ed.frame.stage.names)) ed.frame.stage.names = ["", "", "", ""];
+  ed.frame.stage.names[Number(inp.dataset.nameIdx)] = inp.value;
+  drawEditor();
+});
+$("#ed-snip-silence").addEventListener("change", e => { ed.frame.snipSilence = e.target.checked; });
 
 $("#ed-add-box").addEventListener("click", () => {
   const boxes = getFrameBoxes(ed.frame);

@@ -70,7 +70,7 @@ $("#ed-tpl-apply").addEventListener("click", () => {
   if (!t) return;
   previewStop();
   const stage = normalizeStageConfig(t.frame.stage || {});
-  ed.frame = { fit: !!t.frame.fit, layout: t.frame.layout || "stack", boxes: tplClone(t.frame.boxes || getFrameBoxes(defaultFrame())), stage };
+  ed.frame = { fit: !!t.frame.fit, layout: t.frame.layout || "stack", snipSilence: !!t.frame.snipSilence, boxes: tplClone(t.frame.boxes || getFrameBoxes(defaultFrame())), stage };
   ed.sel = 0;
   edSyncUI(); drawEditor();
   const now = state.vw / state.vh;
