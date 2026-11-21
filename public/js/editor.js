@@ -48,8 +48,6 @@ function edSyncUI() {
   document.querySelectorAll("#ed-stage-mode button").forEach(b => b.classList.toggle("on", (b.dataset.stage === "1") === !!st.enabled));
   $("#ed-stage-opts").hidden = !st.enabled;
   document.querySelectorAll("#ed-stage-bg button").forEach(b => b.classList.toggle("on", b.dataset.bg === st.bg));
-  $("#ed-hook-text").value = st.hookText || "";
-  $("#ed-hook-badge").value = st.hookBadge || "";
   $("#ed-stage-focus").value = st.speakerFocus || "auto";
   $("#ed-stage-wave").checked = st.waveform !== false;
   $("#ed-stage-glow").checked = st.activeGlow !== false;
@@ -94,8 +92,6 @@ async function openEditor(i) {
     ed.index = i; ed.sel = 0;
     const rawFrame = clone(item.vFrame || state.lastFrame || defaultFrame());
     const stage = typeof normalizeStageConfig === "function" ? normalizeStageConfig(rawFrame.stage, item) : { enabled: false };
-    // Hook text is strictly individual per clip
-    stage.hookText = item.vFrame?.stage?.hookText ?? (item.hook || item.caption || "");
     ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame), stage };
     const slider = $("#ed-time");
     slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
@@ -245,8 +241,6 @@ $("#ed-stage-bg").addEventListener("click", e => {
   ed.frame.stage.bg = b.dataset.bg;
   edSyncUI(); drawEditor();
 });
-$("#ed-hook-text").addEventListener("input", e => { ed.frame.stage.hookText = e.target.value; drawEditor(); });
-$("#ed-hook-badge").addEventListener("input", e => { ed.frame.stage.hookBadge = e.target.value; drawEditor(); });
 $("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; drawEditor(); });
 $("#ed-stage-wave").addEventListener("change", e => { ed.frame.stage.waveform = e.target.checked; drawEditor(); });
 $("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; drawEditor(); });

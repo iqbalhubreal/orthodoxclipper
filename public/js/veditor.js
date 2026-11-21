@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text & hook only in Individual mode). */
+/* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text only in Individual mode). */
 const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, guides: null, showIgGuide: true, scope: "all" };
 
 const VED_FONTS = [
@@ -134,18 +134,6 @@ function drawVerticalLayers(ctx, baseCv, W, H, layers) {
     }
   }
 }
-function getClipHookText(idx) {
-  const item = state.outputs[idx];
-  return item?.vFrame?.stage?.hookText ?? (item?.hook || item?.caption || ved.frame?.stage?.hookText || "");
-}
-function setClipHookText(idx, text) {
-  const item = state.outputs[idx];
-  if (!item) return;
-  if (!item.vFrame) item.vFrame = clone(ved.frame || defaultFrame());
-  if (!item.vFrame.stage) item.vFrame.stage = defaultStageConfig(item);
-  item.vFrame.stage.hookText = text;
-  if (idx === ed.index && ed.frame?.stage) ed.frame.stage.hookText = text;
-}
 function drawVEditor() {
   const v = ved.video, cv = $("#ved-canvas"), ctx = cv.getContext("2d");
   if (!v || !cv) return;
@@ -157,9 +145,7 @@ function drawVEditor() {
     const boxes = getFrameBoxes(ved.frame), slots = getLayoutSlots(boxes.length, ved.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
     if (ved.frame.stage?.enabled && typeof drawStageComposition === "function") {
-      const clipFrame = clone(ved.frame);
-      clipFrame.stage.hookText = getClipHookText(ved.index);
-      drawStageComposition(bctx, v, sw, sh, boxes, clipFrame, W, H, {
+      drawStageComposition(bctx, v, sw, sh, boxes, ved.frame, W, H, {
         energy: 0.55,
         timestamp: Number($("#ved-time").value) || 0,
         showGuide: false,
@@ -224,9 +210,6 @@ function vedSyncClipBar() {
 function vedSyncControls() {
   const isIndiv = ved.scope === "individual";
   $("#ved-add-text").hidden = !isIndiv;
-  const showStageHook = isIndiv && !!ved.frame?.stage?.enabled;
-  $("#ved-stage-hook-card").hidden = !showStageHook;
-  if (showStageHook) $("#ved-stage-hook-input").value = getClipHookText(ved.index);
   document.querySelectorAll("#ved-scope button").forEach(b => b.classList.toggle("on", b.dataset.scope === ved.scope));
   vedSyncClipBar();
 
@@ -480,10 +463,6 @@ $("#ved-scope")?.addEventListener("click", e => {
   if (!b) return;
   ved.scope = b.dataset.scope === "individual" ? "individual" : "all";
   vedSyncControls();
-  drawVEditor();
-});
-$("#ved-stage-hook-input")?.addEventListener("input", e => {
-  setClipHookText(ved.index, e.target.value);
   drawVEditor();
 });
 $("#ved-ig-guide")?.addEventListener("change", e => { ved.showIgGuide = e.target.checked; drawVEditor(); });

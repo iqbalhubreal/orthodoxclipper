@@ -177,10 +177,6 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
 async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
   const clipFrame = clone(frame);
-  if (clipFrame.stage && i !== ed.index) {
-    // Text in 2.5D stage always remains individual per clip, never copied by Apply to all
-    clipFrame.stage.hookText = item.vFrame?.stage?.hookText ?? (item.hook || item.caption || "");
-  }
   item.vFrame = clone(clipFrame);
   const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled;
   let vBlob = useWebCodecs
