@@ -1,5 +1,5 @@
 "use strict";
-/* History stored in this browser. On mobile, retains only the most recent session's exported clips locally in IndexedDB and displays them for playback/download. */
+/* History stored in this browser. On mobile, retains only the most recent session's exported clips locally in IndexedDB and displays them for playback/download/re-editing. */
 const HIST_KEY = "clipper.history";
 const MOBILE_CACHE = IS_MOBILE || IS_ANDROID_APP;
 const IDB_NAME = "orthodoxclipper_latest";
@@ -100,7 +100,7 @@ async function syncHistory(replaceClips = false) {
   }
   Object.assign(entry, {
     url: state.sessionUrl, videoId: ytId(state.sessionUrl), fileName: state.file?.name || "", notes: state.sessionNotes,
-    clips: state.outputs.map(o => ({ title: o.title, start: o.start, end: o.end, note: o.note, caption: o.caption, tagsText: o.tagsText, hasVert: !!o.vBlob }))
+    clips: state.outputs.map(o => ({ title: o.title, start: o.start, end: o.end, note: o.note, hook: o.hook || "", caption: o.caption, tagsText: o.tagsText, hasVert: !!o.vBlob }))
   });
   saveHistory(list);
   updateHistoryBadge();
@@ -122,6 +122,8 @@ function localClipHTML(hRec, vRec) {
   const btns = [];
   if (hRec) btns.push(`<a class="btn" href="${hUrl}" download="${escapeHTML(hRec.name || "clip.mp4")}" data-h-dl="h">Download MP4</a>`);
   if (vRec) btns.push(`<a class="btn primary" href="${vUrl}" download="${escapeHTML(vRec.name || "clip-vertical.mp4")}" data-h-dl="v">Download vertical MP4</a>`);
+  if (hRec) btns.push(`<button class="btn" type="button" data-h="make-vert">${vRec ? "Redo vertical" : "Make vertical"}</button>`);
+  if (vRec) btns.push(`<button class="btn" type="button" data-h="edit-vert">Edit vertical</button>`);
   return `<div class="clip" style="margin-top:10px;padding:0;border:0;background:transparent">
       <video class="${vRec ? "vertical" : ""}" controls playsinline preload="metadata" src="${mainUrl}"></video>
     </div>
@@ -155,6 +157,58 @@ function entryHTML(e, idx, localClips) {
     ${body}
   </article>`;
 }
+async function restoreHistorySession(entryId) {
+  const entry = loadHistory().find(x => x.id === entryId);
+  if (!entry) return false;
+  const localClips = await loadLatestMobileClips();
+  const restored = [];
+  (entry.clips || []).forEach((c, j) => {
+    const hRec = localClips.get(`h_${j}`);
+    const vRec = localClips.get(`v_${j}`);
+    if (!hRec?.blob && !vRec?.blob) return;
+    const blob = hRec?.blob || vRec.blob;
+    const name = hRec?.name || `${String(j + 1).padStart(2, "0")}-clip.mp4`;
+    const item = {
+      title: c.title || `Clip ${j + 1}`,
+      start: c.start || 0,
+      end: c.end || 0,
+      note: c.note || "",
+      hook: c.hook || "",
+      caption: c.caption || "",
+      tagsText: c.tagsText || "",
+      cutSeconds: 0,
+      blob,
+      name,
+      url: URL.createObjectURL(blob),
+    };
+    if (vRec?.blob) {
+      item.vBlob = vRec.blob;
+      item.vName = vRec.name || name.replace(/\.mp4$/, "") + "-vertical.mp4";
+      item.vUrl = URL.createObjectURL(vRec.blob);
+    }
+    restored.push(item);
+  });
+  if (!restored.length) return false;
+  resetOutputs();
+  state.historyId = entry.id;
+  state.sessionUrl = entry.url || "";
+  state.sessionNotes = entry.notes || "";
+  state.outputs = restored;
+  restored.forEach((item, idx) => {
+    $("#clip-list").insertAdjacentHTML("beforeend", cardHTML(item, idx));
+    if (item.vUrl) {
+      const box = $(`#vbox-${idx}`);
+      if (box) {
+        box.hidden = false;
+        box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a><button class="btn" data-vedit="${idx}" type="button">Edit vertical</button></div>`;
+      }
+      const btn = document.querySelector(`button[data-vert="${idx}"]`);
+      if (btn) btn.textContent = "Redo vertical";
+    }
+  });
+  updateResultsHeader();
+  return true;
+}
 async function renderHistory() {
   revokeHistUrls();
   const list = loadHistory();
@@ -163,7 +217,7 @@ async function renderHistory() {
   const notice = $("#h-notice");
   if (notice) {
     notice.textContent = MOBILE_CACHE
-      ? "Mobile storage notice: only clips from your most recent exported session are retained locally. Saving a new session replaces the previous one."
+      ? "Mobile storage notice: only clips from your most recent exported session are retained locally for playback and re-editing."
       : "Saved in this browser (videos are not stored).";
   }
   $("#h-clear").hidden = !list.length;
@@ -217,6 +271,13 @@ $("#h-list").addEventListener("click", async e => {
     $("#notes").value = entry.notes || ""; $("#yt").value = entry.url || "";
     notesChanged(); renderPrompt(); renderDetected(); closeHistory(); openStep(3); window.scrollTo({ top: 0, behavior: "smooth" });
     toast("Notes and link restored. Upload the video again to cut.");
+  } else if (kind === "make-vert" || kind === "edit-vert") {
+    const j = Number(btn.closest(".h-clip")?.dataset.hc) || 0;
+    const ok = await restoreHistorySession(id);
+    if (!ok) return toast("Saved video clip was not found on this device.", true);
+    closeHistory();
+    if (kind === "edit-vert") openVerticalEditor(j, { postVertical: true });
+    else openEditor(j);
   } else if (kind === "copy") {
     const cap = getCap(btn.closest(".h-clip").querySelector(".cap-block").dataset.src);
     if (cap) copyText(`${cap.caption}\n\n${cap.tagsText}`, "Caption and hashtags copied.");

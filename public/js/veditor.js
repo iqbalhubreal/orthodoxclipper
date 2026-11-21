@@ -1,24 +1,24 @@
 "use strict";
-/* Vertical Editor: simple blur boxes (Smooth/Pixel/Frosted + Intensity), image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts + IG Subtitles Safe Zone guide. */
+/* Vertical Editor: blur boxes, image overlays, movable/resizable text & hook boxes with readable Instagram-Edits-style fonts + IG Subtitles Safe Zone guide. */
 const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null, showIgGuide: true };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
-  { id: "classic_medium", name: "Classic Medium", weight: 500, family: '"Inter", system-ui, -apple-system, sans-serif' },
-  { id: "classic_light", name: "Classic Light", weight: 300, family: '"Inter", system-ui, -apple-system, sans-serif' },
+  { id: "classic_medium", name: "Classic Med", weight: 500, family: '"Inter", system-ui, -apple-system, sans-serif' },
   { id: "modern", name: "Modern", weight: 500, family: '"Oswald", "Arial Narrow", sans-serif' },
   { id: "modern_bold", name: "Modern Bold", weight: 700, family: '"Oswald", "Arial Narrow", sans-serif' },
-  { id: "signature", name: "Signature", weight: 600, family: '"Dancing Script", cursive' },
-  { id: "editor", name: "Editor", weight: 700, family: '"Courier Prime", ui-monospace, monospace' },
-  { id: "poster", name: "Poster", weight: 400, family: '"Alfa Slab One", Georgia, serif' },
+  { id: "headline", name: "Headline", weight: 800, family: '"Montserrat", system-ui, sans-serif' },
+  { id: "clean", name: "Clean", weight: 700, family: '"Poppins", system-ui, sans-serif' },
+  { id: "sharp", name: "Sharp", weight: 700, family: '"Roboto", system-ui, sans-serif' },
+  { id: "poster", name: "Poster", weight: 400, family: '"Bebas Neue", "Oswald", sans-serif' },
 ];
-const VED_COLORS = ["#ffffff", "#000000", "#f0b35a", "#8b79ff", "#42c98b", "#ff5a5f"];
+const VED_COLORS = ["#ffffff", "#000000", "#38bdf8", "#f0b35a", "#42c98b", "#ff5a5f"];
 
 function cloneLayers(layers) {
   return (layers || []).map(l => {
     const copy = { kind: l.kind, x: l.x, y: l.y, w: l.w, h: l.h };
     if (l.kind === "blur") { copy.blurType = l.blurType; copy.amount = l.amount; }
-    else if (l.kind === "text") { copy.text = l.text; copy.fontId = l.fontId; copy.fontSize = l.fontSize; copy.color = l.color; copy.bg = l.bg; }
+    else if (l.kind === "text") { copy.text = l.text; copy.fontId = l.fontId; copy.fontSize = l.fontSize; copy.color = l.color; copy.bg = l.bg; copy.align = l.align || "center"; }
     else { copy.name = l.name; copy.url = l.url; copy.aspect = l.aspect; }
     return copy;
   });
@@ -52,11 +52,12 @@ function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
   const font = VED_FONTS.find(f => f.id === l.fontId) || VED_FONTS[0];
   const pxSize = Math.max(10, Math.round((l.fontSize || 32) * s));
   const lineH = Math.round(pxSize * 1.22);
+  const align = l.align || "center";
   ctx.save();
   ctx.font = `${font.weight} ${pxSize}px ${font.family}`;
-  ctx.textAlign = "center";
+  ctx.textAlign = align;
   ctx.textBaseline = "middle";
-  const padX = Math.round(12 * s);
+  const padX = Math.round(14 * s);
   const maxW = Math.max(20, rw - padX * 2);
   const words = String(l.text || "").split(/\n/);
   const lines = [];
@@ -69,27 +70,32 @@ function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
     }
     lines.push(cur);
   }
-  if (l.bg === "dark" || l.bg === "light") {
-    ctx.fillStyle = l.bg === "dark" ? "rgba(12, 13, 18, 0.78)" : "rgba(255, 255, 255, 0.88)";
-    const r = Math.round(12 * s);
+  if (l.bg === "dark" || l.bg === "light" || l.bg === "accent") {
+    ctx.fillStyle = l.bg === "dark" ? "rgba(12, 16, 26, 0.86)" : l.bg === "light" ? "rgba(255, 255, 255, 0.92)" : "rgba(37, 99, 235, 0.90)";
+    const r = Math.round(14 * s);
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(rx, ry, rw, rh, r);
     else ctx.rect(rx, ry, rw, rh);
     ctx.fill();
+    if (l.bg === "dark") {
+      ctx.lineWidth = Math.max(1, 1.5 * s);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.45)";
+      ctx.stroke();
+    }
   }
   ctx.beginPath();
   ctx.rect(rx, ry, rw, rh);
   ctx.clip();
   ctx.fillStyle = l.color || "#ffffff";
   if (l.bg === "none") {
-    ctx.shadowColor = "rgba(0,0,0,0.65)";
-    ctx.shadowBlur = Math.round(6 * s);
+    ctx.shadowColor = "rgba(0,0,0,0.75)";
+    ctx.shadowBlur = Math.round(7 * s);
     ctx.shadowOffsetY = Math.round(2 * s);
   }
   const totalH = lines.length * lineH;
   const startY = ry + (rh - totalH) / 2 + lineH / 2;
-  const cx = rx + rw / 2;
-  lines.forEach((line, idx) => ctx.fillText(line, cx, startY + idx * lineH));
+  const tx = align === "left" ? rx + padX : align === "right" ? rx + rw - padX : rx + rw / 2;
+  lines.forEach((line, idx) => ctx.fillText(line, tx, startY + idx * lineH));
   ctx.restore();
 }
 function drawVerticalLayers(ctx, baseCv, W, H, layers) {
@@ -196,6 +202,7 @@ function drawVEditor() {
 }
 function vedSyncControls() {
   $("#ved-add-text").hidden = !ved.postVertical;
+  $("#ved-add-hook").hidden = !ved.postVertical;
   const l = ved.layers[ved.sel];
   $("#ved-layer-tools").hidden = !l;
   if (!l) return;
@@ -207,9 +214,12 @@ function vedSyncControls() {
     $("#ved-amount-val").textContent = l.amount;
   } else if (l.kind === "text" && ved.postVertical) {
     $("#ved-text-input").value = l.text || "";
+    $("#ved-font-size").value = l.fontSize || 32;
+    $("#ved-fsize-val").textContent = l.fontSize || 32;
     document.querySelectorAll("#ved-font-grid button").forEach(b => b.classList.toggle("on", b.dataset.font === l.fontId));
     document.querySelectorAll("#ved-text-colors button").forEach(b => b.classList.toggle("on", b.dataset.color === l.color));
     document.querySelectorAll("#ved-text-bg button").forEach(b => b.classList.toggle("on", b.dataset.tbg === l.bg));
+    document.querySelectorAll("#ved-text-align button").forEach(b => b.classList.toggle("on", b.dataset.align === (l.align || "center")));
   }
 }
 function vedRenderFontUI() {
@@ -252,9 +262,23 @@ function vedAddBlur() {
   vedSyncControls();
   drawVEditor();
 }
-function vedAddText() {
+function vedAddText(isHook = false) {
   if (!ved.postVertical) return;
-  ved.layers.push({ kind: "text", text: "Your text", fontId: "classic", fontSize: 34, color: "#ffffff", bg: "none", x: 0.15, y: 0.44, w: 0.7, h: 0.12 });
+  const item = state.outputs[ved.index];
+  const defaultHook = item?.hook || item?.caption || "Wait... What do you think?";
+  ved.layers.push({
+    kind: "text",
+    text: isHook ? defaultHook : "Your text",
+    fontId: isHook ? "headline" : "classic",
+    fontSize: isHook ? 26 : 32,
+    color: "#ffffff",
+    bg: isHook ? "dark" : "none",
+    align: "center",
+    x: isHook ? 0.06 : 0.15,
+    y: isHook ? 0.04 : 0.44,
+    w: isHook ? 0.88 : 0.7,
+    h: isHook ? 0.13 : 0.12,
+  });
   ved.sel = ved.layers.length - 1;
   vedSyncControls();
   drawVEditor();
@@ -267,8 +291,8 @@ function vedAddImageOverlay(id) {
   const img = new Image();
   img.onload = () => {
     const aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
-    const w = 0.6;
-    const h = Math.min(0.6, (w * (9 / 16)) / aspect);
+    const w = 0.45;
+    const h = Math.min(0.45, (w * (9 / 16)) / aspect);
     ved.layers.push({ kind: "image", name: ov.name, url: ov.url, img, aspect, x: (1 - w) / 2, y: 0.45, w, h });
     ved.sel = ved.layers.length - 1;
     vedSyncControls();
@@ -304,7 +328,7 @@ async function openVerticalEditor(i, opts = {}) {
     $("#ved-title").textContent = `Vertical Editor: ${item.title}`;
     const cv = $("#ved-canvas");
     cv.width = 540; cv.height = 960;
-    $("#ved-stage").style.maxWidth = "calc(50dvh * 0.5625)";
+    $("#ved-stage").style.maxWidth = "calc(46dvh * 0.5625)";
     vedRenderFontUI();
     vedRenderOverlayList();
     vedRenderClips(i);
@@ -367,7 +391,7 @@ function vedHit(p) {
     const l = ved.layers[ved.sel];
     const cx = clamp((l.x + l.w) * W, 10, W - 10), cy = clamp((l.y + l.h) * H, 10, H - 10);
     if (Math.hypot(px.x - cx, px.y - cy) <= r0) {
-      return { idx: ved.sel, mode: "resize", ox: p.x - (l.x + l.w), oy: p.y - (l.y + l.h), baseW: l.w, baseFont: l.fontSize || 34 };
+      return { idx: ved.sel, mode: "resize", ox: p.x - (l.x + l.w), oy: p.y - (l.y + l.h), baseW: l.w, baseFont: l.fontSize || 32 };
     }
   }
   for (let idx = ved.layers.length - 1; idx >= 0; idx--) {
@@ -410,9 +434,6 @@ vedCanvas.addEventListener("pointermove", e => {
       B = T + nh;
     }
     l.w = R - L; l.h = B - T;
-    if (l.kind === "text" && d.baseW > 0) {
-      l.fontSize = clamp(Math.round(d.baseFont * (l.w / d.baseW)), 12, 140);
-    }
   }
   drawVEditor();
 });
@@ -475,7 +496,8 @@ async function exportPostVerticalEdits(i, layers) {
 $("#ved-time").addEventListener("input", async e => { await vedSeek(Number(e.target.value)); drawVEditor(); });
 $("#ved-ig-guide")?.addEventListener("change", e => { ved.showIgGuide = e.target.checked; drawVEditor(); });
 $("#ved-add-blur").addEventListener("click", vedAddBlur);
-$("#ved-add-text").addEventListener("click", vedAddText);
+$("#ved-add-text").addEventListener("click", () => vedAddText(false));
+$("#ved-add-hook")?.addEventListener("click", () => vedAddText(true));
 $("#ved-btype").addEventListener("click", e => {
   const b = e.target.closest("button[data-btype]");
   if (!b || !ved.layers[ved.sel]) return;
@@ -494,6 +516,13 @@ $("#ved-text-input").addEventListener("input", e => {
   const l = ved.layers[ved.sel];
   if (!l || l.kind !== "text") return;
   l.text = e.target.value;
+  drawVEditor();
+});
+$("#ved-font-size")?.addEventListener("input", e => {
+  const l = ved.layers[ved.sel];
+  if (!l || l.kind !== "text") return;
+  l.fontSize = Number(e.target.value);
+  $("#ved-fsize-val").textContent = l.fontSize;
   drawVEditor();
 });
 $("#ved-font-grid").addEventListener("click", e => {
@@ -518,6 +547,24 @@ $("#ved-text-bg").addEventListener("click", e => {
   if (!b || !l || l.kind !== "text") return;
   l.bg = b.dataset.tbg;
   vedSyncControls();
+  drawVEditor();
+});
+$("#ved-text-align")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-align]");
+  const l = ved.layers[ved.sel];
+  if (!b || !l || l.kind !== "text") return;
+  l.align = b.dataset.align;
+  vedSyncControls();
+  drawVEditor();
+});
+$("#ved-nudge")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-nudge]");
+  const l = ved.layers[ved.sel];
+  if (!b || !l) return;
+  const dir = b.dataset.nudge;
+  if (dir === "up") l.y = clamp(l.y - 0.03, 0, 1 - l.h);
+  else if (dir === "down") l.y = clamp(l.y + 0.03, 0, 1 - l.h);
+  else if (dir === "cx") l.x = clamp((1 - l.w) / 2, 0, 1 - l.w);
   drawVEditor();
 });
 $("#ved-del-layer").addEventListener("click", () => {

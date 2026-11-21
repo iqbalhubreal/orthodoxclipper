@@ -97,9 +97,6 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
   const audioEnv = stageEnabled && (frame.stage.waveform || frame.stage.activeGlow)
     ? await extractAudioEnvelope(item.blob, FPS)
     : null;
-  const logoImg = stageEnabled && frame.stage.centerLogoId
-    ? await getStageLogoById(frame.stage.centerLogoId)
-    : null;
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
   let ctx = null, baseCv = null, baseCtx = null, boxes = null, sw = 0, sh = 0, frameCount = 0;
@@ -146,7 +143,6 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
             drawStageComposition(targetCtx, sample, sw, sh, frameBoxes, frame, W, TOTAL_H, {
               energy,
               timestamp: ts,
-              logoImg,
               showGuide: false,
             });
           } else {

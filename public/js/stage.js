@@ -1,5 +1,5 @@
 "use strict";
-/* 2.5D Debate Stage renderer: studio backgrounds, top debate hook, rounded speaker cards, audio-reactive glow & waveform, center logo badge, and Instagram Edits subtitle safe zone. */
+/* 2.5D Debate Stage renderer: studio backgrounds, top debate hook, rounded speaker cards, audio-reactive glow & waveform, and Instagram Edits subtitle safe zone. */
 
 const STAGE_BG_PRESETS = [
   { id: "midnight", name: "Midnight Studio", c1: "#090d16", c2: "#131c2e", accent: "#38bdf8", glow: "rgba(56, 189, 248, 0.20)", grid: "rgba(255, 255, 255, 0.045)" },
@@ -16,7 +16,6 @@ function defaultStageConfig(item = null) {
     hookBadge: "DEBATE CLIP",
     hookText: item?.hook || item?.caption || "",
     hookSub: "",
-    centerLogoId: "",
     waveform: true,
     activeGlow: true,
     subtitleSafeZone: true,
@@ -33,7 +32,6 @@ function normalizeStageConfig(raw, item = null) {
     hookBadge: String(raw.hookBadge ?? base.hookBadge).slice(0, 28),
     hookText: String(raw.hookText ?? base.hookText).slice(0, 140),
     hookSub: String(raw.hookSub ?? base.hookSub).slice(0, 100),
-    centerLogoId: String(raw.centerLogoId || ""),
     waveform: raw.waveform !== false,
     activeGlow: raw.activeGlow !== false,
     subtitleSafeZone: raw.subtitleSafeZone !== false,
@@ -78,7 +76,7 @@ function wrapStageLines(ctx, text, maxW, maxLines = 3) {
 function getStageLayoutBoxes(count, layoutId, W, H, stage) {
   const s = W / 1080;
   const padX = Math.round(64 * s);
-  const gap = Math.round(76 * s); // divider space for waveform + center logo
+  const gap = Math.round(72 * s);
   const smallGap = Math.round(22 * s);
   const hasHook = !!(stage?.hookText && stage.hookText.trim());
   const topY = hasHook ? Math.round(316 * s) : Math.round(96 * s);
@@ -156,14 +154,12 @@ function drawStageBackground(ctx, W, H, preset, sourceFrame = null) {
     ctx.fillRect(0, 0, W, H);
   }
 
-  // Subtle radial spotlight
   const rad = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.05, W * 0.5, H * 0.42, W * 0.85);
   rad.addColorStop(0, preset.glow);
   rad.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = rad;
   ctx.fillRect(0, 0, W, H);
 
-  // Subtle studio grid
   const step = Math.round(W / 12);
   ctx.save();
   ctx.strokeStyle = preset.grid;
@@ -200,7 +196,6 @@ function drawStageHookBanner(ctx, W, stage, preset) {
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Badge pill
   const badge = String(stage.hookBadge || "DEBATE CLIP").trim().toUpperCase();
   if (badge) {
     const bw = Math.min(w - Math.round(64 * s), Math.round((badge.length * 14 + 48) * s));
@@ -220,7 +215,6 @@ function drawStageHookBanner(ctx, W, stage, preset) {
     ctx.fillText(badge, W / 2, by + bh / 2 + s);
   }
 
-  // Hook headline
   ctx.font = `700 ${Math.max(11, Math.round(40 * s))}px "Inter", system-ui, sans-serif`;
   ctx.fillStyle = "#f8fafc";
   ctx.textAlign = "center";
@@ -230,7 +224,6 @@ function drawStageHookBanner(ctx, W, stage, preset) {
   const textStartY = y + Math.round((lines.length === 1 ? 142 : 122) * s);
   lines.forEach((line, idx) => ctx.fillText(line, W / 2, textStartY + idx * lineH));
 
-  // Optional sub-line
   const sub = String(stage.hookSub || "").trim();
   if (sub) {
     ctx.font = `500 ${Math.max(8, Math.round(24 * s))}px "Inter", system-ui, sans-serif`;
@@ -240,62 +233,27 @@ function drawStageHookBanner(ctx, W, stage, preset) {
   ctx.restore();
 }
 
-function drawStageDivider(ctx, W, dividerY, preset, energy, logoImg, showWave) {
+function drawStageDivider(ctx, W, dividerY, preset, energy) {
   const s = W / 1080;
-  const marginX = Math.round(68 * s);
-  const hasLogo = !!(logoImg && logoImg.complete && logoImg.naturalWidth);
-  const badgeW = hasLogo ? Math.round(112 * s) : 0;
-  const badgeH = Math.round(62 * s);
-  const centerGap = hasLogo ? badgeW + Math.round(28 * s) : 0;
+  const marginX = Math.round(72 * s);
+  const bars = 44;
+  const totalW = W - marginX * 2;
+  const step = totalW / bars;
+  const bw = Math.max(2, step * 0.52);
 
-  if (showWave) {
-    const bars = 28;
-    const totalSideW = (W - marginX * 2 - centerGap) / (hasLogo ? 2 : 1);
-    const drawSide = (startX, width, flip) => {
-      const step = width / bars;
-      const bw = Math.max(2, step * 0.52);
-      ctx.save();
-      ctx.fillStyle = preset.accent;
-      for (let i = 0; i < bars; i++) {
-        const norm = (i / (bars - 1));
-        const envelope = Math.sin(norm * Math.PI);
-        const wave = 0.25 + 0.75 * Math.abs(Math.sin((i + energy * 14) * 0.85));
-        const h = Math.max(Math.round(5 * s), Math.round((8 + energy * 42 * envelope * wave) * s));
-        const x = flip ? startX + width - (i + 1) * step : startX + i * step;
-        ctx.globalAlpha = 0.35 + 0.6 * energy * envelope;
-        stageRoundRectPath(ctx, x, dividerY - h / 2, bw, h, bw / 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    };
-    if (hasLogo) {
-      drawSide(marginX, totalSideW, false);
-      drawSide(W - marginX - totalSideW, totalSideW, true);
-    } else {
-      drawSide(marginX, totalSideW, false);
-    }
-  }
-
-  if (hasLogo) {
-    const bx = Math.round(W / 2 - badgeW / 2);
-    const by = Math.round(dividerY - badgeH / 2);
-    ctx.save();
-    stageRoundRectPath(ctx, bx, by, badgeW, badgeH, badgeH / 2);
-    ctx.fillStyle = "rgba(15, 20, 32, 0.94)";
+  ctx.save();
+  ctx.fillStyle = preset.accent;
+  for (let i = 0; i < bars; i++) {
+    const norm = i / (bars - 1);
+    const envelope = Math.sin(norm * Math.PI);
+    const wave = 0.25 + 0.75 * Math.abs(Math.sin((i + energy * 14) * 0.78));
+    const h = Math.max(Math.round(5 * s), Math.round((8 + energy * 42 * envelope * wave) * s));
+    const x = marginX + i * step;
+    ctx.globalAlpha = 0.35 + 0.6 * energy * envelope;
+    stageRoundRectPath(ctx, x, dividerY - h / 2, bw, h, bw / 2);
     ctx.fill();
-    ctx.lineWidth = Math.max(1, 2 * s);
-    ctx.strokeStyle = preset.accent;
-    ctx.stroke();
-
-    const pad = Math.round(10 * s);
-    const maxW = badgeW - pad * 2;
-    const maxH = badgeH - pad * 2;
-    const aspect = logoImg.naturalWidth / Math.max(1, logoImg.naturalHeight);
-    let lw = maxW, lh = lw / aspect;
-    if (lh > maxH) { lh = maxH; lw = lh * aspect; }
-    ctx.drawImage(logoImg, W / 2 - lw / 2, dividerY - lh / 2, lw, lh);
-    ctx.restore();
   }
+  ctx.restore();
 }
 
 function drawStageSubtitleGuide(ctx, W, H, isPreview = true) {
@@ -325,7 +283,6 @@ function resolveActiveSpeaker(stage, count, timestamp, energy) {
   if (stage.speakerFocus === "top") return 0;
   if (stage.speakerFocus === "bottom") return 1;
   if (stage.speakerFocus === "both") return -1;
-  // Auto mode: alternate emphasis cleanly on vocal cadence when energy is active
   if (energy < 0.08) return -1;
   return Math.floor(timestamp / 3.5) % count;
 }
@@ -355,7 +312,6 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
     const m = mapBox(px(box), rect.w, rect.h, frame.fit);
 
     ctx.save();
-    // Soft card drop shadow
     ctx.shadowColor = isActive && stage.activeGlow ? preset.glow : "rgba(0, 0, 0, 0.55)";
     ctx.shadowBlur = Math.round((isActive && stage.activeGlow ? 24 + energy * 18 : 16) * s);
     ctx.shadowOffsetY = Math.round(8 * s);
@@ -364,7 +320,6 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
     ctx.fill();
     ctx.restore();
 
-    // Clipped video inside rounded card
     ctx.save();
     stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
     ctx.clip();
@@ -383,7 +338,6 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
     }
     ctx.restore();
 
-    // Card border
     ctx.save();
     stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
     ctx.lineWidth = Math.max(1, (isActive && stage.activeGlow ? 3.5 + energy * 2 : 1.5) * s);
@@ -392,8 +346,8 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
     ctx.restore();
   });
 
-  if (stage.waveform || opts.logoImg) {
-    drawStageDivider(ctx, W, layoutInfo.dividerY, preset, energy, opts.logoImg, stage.waveform);
+  if (stage.waveform) {
+    drawStageDivider(ctx, W, layoutInfo.dividerY, preset, energy);
   }
   if (stage.subtitleSafeZone && opts.showGuide) {
     drawStageSubtitleGuide(ctx, W, H, true);
@@ -426,17 +380,4 @@ async function extractAudioEnvelope(blob, fps = 30) {
   } catch {
     return null;
   }
-}
-
-function getStageLogoById(id) {
-  if (!id) return null;
-  const all = [...(typeof PRESET_OVERLAYS !== "undefined" ? PRESET_OVERLAYS : []), ...(typeof loadSavedOverlays === "function" ? loadSavedOverlays() : [])];
-  const item = all.find(x => x.id === id);
-  if (!item?.url) return Promise.resolve(null);
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = item.url;
-  });
 }

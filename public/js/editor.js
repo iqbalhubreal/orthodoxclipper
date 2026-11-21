@@ -2,7 +2,7 @@
 /* Vertical framing editor (1 to 4 adjustable cropping boxes, flexible layouts, 2.5D Debate Stage, canvas, drag handles, preview, mobile layout). */
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 const BOX_COLORS = ["#8b79ff", "#42c98b", "#f0b35a", "#38bdf8"];
-const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0, logoImg: null };
+const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0 };
 
 function boxLabel(idx, count) {
   if (count === 1) return "Full";
@@ -25,21 +25,6 @@ function edRenderStageControls() {
       `<button type="button" class="stage-bg-dot" data-bg="${p.id}" title="${escapeHTML(p.name)}" style="background:linear-gradient(135deg,${p.c1},${p.c2});box-shadow:inset 0 0 0 2px ${p.accent}55"></button>`
     ).join("");
   }
-  const allLogos = [
-    ...(typeof PRESET_OVERLAYS !== "undefined" ? PRESET_OVERLAYS : []),
-    ...(typeof loadSavedOverlays === "function" ? loadSavedOverlays() : []),
-  ];
-  const sel = $("#ed-stage-logo");
-  const cur = ed.frame?.stage?.centerLogoId || "";
-  sel.innerHTML = `<option value="">None (waveform only)</option>` + allLogos.map(o =>
-    `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`
-  ).join("");
-  sel.value = cur;
-}
-async function edRefreshLogo() {
-  const id = ed.frame?.stage?.centerLogoId || "";
-  ed.logoImg = id && typeof getStageLogoById === "function" ? await getStageLogoById(id) : null;
-  if (!$("#editor").hidden && state.edVideo) drawEditor();
 }
 function edSyncUI() {
   const boxes = getFrameBoxes(ed.frame);
@@ -65,7 +50,6 @@ function edSyncUI() {
   document.querySelectorAll("#ed-stage-bg button").forEach(b => b.classList.toggle("on", b.dataset.bg === st.bg));
   $("#ed-hook-text").value = st.hookText || "";
   $("#ed-hook-badge").value = st.hookBadge || "";
-  $("#ed-stage-logo").value = st.centerLogoId || "";
   $("#ed-stage-focus").value = st.speakerFocus || "auto";
   $("#ed-stage-wave").checked = st.waveform !== false;
   $("#ed-stage-glow").checked = st.activeGlow !== false;
@@ -120,7 +104,6 @@ async function openEditor(i) {
     ed.scale = cv.width / state.vw;
     edRenderStageControls();
     edFitStage(); edSyncUI();
-    await edRefreshLogo();
     $("#ed-clips").innerHTML = "";
     edRenderClips(i);
     $("#editor").hidden = false;
@@ -174,7 +157,6 @@ function drawEditor() {
     drawStageComposition(p, v, state.vw, state.vh, boxes, ed.frame, P.width, P.height, {
       energy: 0.55,
       timestamp: Number($("#ed-time").value) || 0,
-      logoImg: ed.logoImg,
       showGuide: ed.frame.stage.subtitleSafeZone,
     });
     return;
@@ -264,7 +246,6 @@ $("#ed-stage-bg").addEventListener("click", e => {
 });
 $("#ed-hook-text").addEventListener("input", e => { ed.frame.stage.hookText = e.target.value; drawEditor(); });
 $("#ed-hook-badge").addEventListener("input", e => { ed.frame.stage.hookBadge = e.target.value; drawEditor(); });
-$("#ed-stage-logo").addEventListener("change", e => { ed.frame.stage.centerLogoId = e.target.value; edRefreshLogo(); });
 $("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; drawEditor(); });
 $("#ed-stage-wave").addEventListener("change", e => { ed.frame.stage.waveform = e.target.checked; drawEditor(); });
 $("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; drawEditor(); });
