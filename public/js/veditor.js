@@ -146,8 +146,7 @@ function drawVEditor() {
     const sw = v.videoWidth, sh = v.videoHeight;
     if (ved.frame.stage?.enabled && typeof drawStageComposition === "function") {
       drawStageComposition(bctx, v, sw, sh, boxes, ved.frame, W, H, {
-        energy: 0.55,
-        timestamp: Number($("#ved-time").value) || 0,
+        ...previewStageOpts(state.outputs[ved.index], ved.frame, Number($("#ved-time").value) || 0),
         showGuide: false,
       });
     } else {
@@ -166,6 +165,7 @@ function drawVEditor() {
   drawVerticalLayers(ctx, ved.baseCv, W, H, ved.layers);
 
   if (ved.showIgGuide && typeof drawStageSubtitleGuide === "function") {
+    if (typeof drawStageHookGuide === "function" && ved.frame?.stage?.hookGuide !== false) drawStageHookGuide(ctx, W, H);
     drawStageSubtitleGuide(ctx, W, H, true);
   }
 
@@ -311,6 +311,7 @@ function vedAddImageOverlay(id) {
 async function loadVedClip(i) {
   const item = state.outputs[i];
   if (!item) return;
+  previewStop();
   const v = ved.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.url });
   await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
   ved.index = i;
@@ -356,6 +357,7 @@ async function openVerticalEditor(i, opts = {}) {
   } catch { toast("Could not open this clip in Vertical Editor.", true); }
 }
 function closeVerticalEditor(reopenFraming = false) {
+  previewStop();
   $("#veditor").hidden = true;
   ved.drag = null;
   ved.guides = null;
@@ -455,7 +457,7 @@ vedCanvas.addEventListener("pointermove", e => {
 });
 ["pointerup", "pointercancel"].forEach(t => vedCanvas.addEventListener(t, () => { ved.drag = null; ved.guides = null; drawVEditor(); }));
 
-$("#ved-time").addEventListener("input", async e => { await vedSeek(Number(e.target.value)); drawVEditor(); });
+$("#ved-time").addEventListener("input", async e => { previewStop(); await vedSeek(Number(e.target.value)); drawVEditor(); });
 $("#ved-prev-clip")?.addEventListener("click", () => switchVedClip(-1));
 $("#ved-next-clip")?.addEventListener("click", () => switchVedClip(1));
 $("#ved-scope")?.addEventListener("click", e => {

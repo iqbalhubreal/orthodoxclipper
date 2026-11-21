@@ -51,7 +51,10 @@ function edSyncUI() {
   $("#ed-stage-focus").value = st.speakerFocus || "auto";
   $("#ed-stage-wave").checked = st.waveform !== false;
   $("#ed-stage-glow").checked = st.activeGlow !== false;
+  $("#ed-stage-detect").checked = !!st.detectSpeaker;
+  $("#ed-stage-detect").disabled = st.activeGlow === false || (st.speakerFocus || "auto") !== "auto";
   $("#ed-stage-subzone").checked = st.subtitleSafeZone !== false;
+  $("#ed-stage-hookzone").checked = st.hookGuide !== false;
 }
 function edCheckedIndices() {
   return [...document.querySelectorAll('#ed-clips input[type="checkbox"]:checked')].map(el => Number(el.value));
@@ -85,6 +88,7 @@ async function openEditor(i) {
   }
   const item = state.outputs[i];
   if (!item || state.busy) return;
+  previewStop();
   const v = state.edVideo = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.url });
   try {
     await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
@@ -109,7 +113,7 @@ async function openEditor(i) {
     await edSeek(Number(slider.value)); drawEditor();
   } catch { toast("This clip can't be previewed in your browser, so vertical framing isn't available for it.", true); }
 }
-const closeEditor = () => { $("#editor").hidden = true; ed.drag = null; document.body.style.overflow = ""; };
+const closeEditor = () => { previewStop(); $("#editor").hidden = true; ed.drag = null; document.body.style.overflow = ""; };
 const rectPx = r => ({ x: r.x * state.vw, y: r.y * state.vh, w: r.w * state.vw, h: r.h * state.vh });
 
 function mapBox(r, dw, dh, fit) {
@@ -152,9 +156,8 @@ function drawEditor() {
   const P = $("#ed-prev"), p = P.getContext("2d"), slots = getLayoutSlots(boxes.length, ed.frame.layout);
   if (ed.frame.stage?.enabled && typeof drawStageComposition === "function") {
     drawStageComposition(p, v, state.vw, state.vh, boxes, ed.frame, P.width, P.height, {
-      energy: 0.55,
-      timestamp: Number($("#ed-time").value) || 0,
-      showGuide: ed.frame.stage.subtitleSafeZone,
+      ...previewStageOpts(state.outputs[ed.index], ed.frame, Number($("#ed-time").value) || 0),
+      showGuide: true,
     });
     return;
   }
@@ -222,7 +225,7 @@ edCanvas.addEventListener("pointermove", e => {
   drawEditor();
 });
 ["pointerup", "pointercancel"].forEach(t => edCanvas.addEventListener(t, () => { ed.drag = null; }));
-$("#ed-time").addEventListener("input", async e => { await edSeek(Number(e.target.value)); drawEditor(); });
+$("#ed-time").addEventListener("input", async e => { previewStop(); await edSeek(Number(e.target.value)); drawEditor(); });
 $("#ed-sel").addEventListener("click", e => {
   const b = e.target.closest("button[data-sel]"); if (!b) return;
   ed.sel = Number(b.dataset.sel); edSyncUI(); drawEditor();
@@ -241,9 +244,11 @@ $("#ed-stage-bg").addEventListener("click", e => {
   ed.frame.stage.bg = b.dataset.bg;
   edSyncUI(); drawEditor();
 });
-$("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; drawEditor(); });
+$("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; edSyncUI(); drawEditor(); });
 $("#ed-stage-wave").addEventListener("change", e => { ed.frame.stage.waveform = e.target.checked; drawEditor(); });
-$("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; drawEditor(); });
+$("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; edSyncUI(); drawEditor(); });
+$("#ed-stage-detect").addEventListener("change", e => { ed.frame.stage.detectSpeaker = e.target.checked; });
+$("#ed-stage-hookzone").addEventListener("change", e => { ed.frame.stage.hookGuide = e.target.checked; drawEditor(); });
 $("#ed-stage-subzone").addEventListener("change", e => { ed.frame.stage.subtitleSafeZone = e.target.checked; drawEditor(); });
 
 $("#ed-add-box").addEventListener("click", () => {
@@ -270,6 +275,7 @@ $("#ed-swap").addEventListener("click", () => {
 });
 $("#ed-reset").addEventListener("click", () => { ed.frame = defaultFrame(); ed.sel = 0; edSyncUI(); drawEditor(); });
 $("#ed-overlays").addEventListener("click", () => {
+  previewStop();
   const frame = clone(ed.frame), idx = ed.index;
   if (state.outputs[idx]) state.outputs[idx].vFrame = clone(frame);
   $("#editor").hidden = true;

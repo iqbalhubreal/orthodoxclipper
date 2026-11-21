@@ -13,13 +13,12 @@ function defaultStageConfig(item = null) {
   return {
     enabled: false,
     bg: "midnight",
-    hookBadge: "",
-    hookText: "",
-    hookSub: "",
     waveform: true,
     activeGlow: true,
     subtitleSafeZone: true,
+    hookGuide: true, // preview-only dashed guide for the empty top area (never rendered into the exported video)
     speakerFocus: "auto", // "auto" | "top" | "bottom" | "both"
+    detectSpeaker: !(typeof IS_MOBILE !== "undefined" && IS_MOBILE), // follow the real speaker (face tracking), when focus is "auto"
   };
 }
 
@@ -29,13 +28,12 @@ function normalizeStageConfig(raw, item = null) {
   return {
     enabled: !!raw.enabled,
     bg: STAGE_BG_PRESETS.some(p => p.id === raw.bg) ? raw.bg : base.bg,
-    hookBadge: String(raw.hookBadge ?? base.hookBadge).slice(0, 28),
-    hookText: String(raw.hookText ?? base.hookText).slice(0, 140),
-    hookSub: String(raw.hookSub ?? base.hookSub).slice(0, 100),
     waveform: raw.waveform !== false,
     activeGlow: raw.activeGlow !== false,
     subtitleSafeZone: raw.subtitleSafeZone !== false,
+    hookGuide: raw.hookGuide !== false,
     speakerFocus: ["auto", "top", "bottom", "both"].includes(raw.speakerFocus) ? raw.speakerFocus : "auto",
+    detectSpeaker: raw.detectSpeaker === undefined ? base.detectSpeaker : !!raw.detectSpeaker,
   };
 }
 
@@ -52,25 +50,6 @@ function stageRoundRectPath(ctx, x, y, w, h, r) {
     ctx.arcTo(x, y, x + w, y, rad);
     ctx.closePath();
   }
-}
-
-function wrapStageLines(ctx, text, maxW, maxLines = 3) {
-  const words = String(text || "").trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return [];
-  const lines = [];
-  let cur = "";
-  for (const w of words) {
-    const test = cur ? `${cur} ${w}` : w;
-    if (ctx.measureText(test).width <= maxW || !cur) {
-      cur = test;
-    } else {
-      lines.push(cur);
-      cur = w;
-      if (lines.length >= maxLines) break;
-    }
-  }
-  if (cur && lines.length < maxLines) lines.push(cur);
-  return lines;
 }
 
 function getStageLayoutBoxes(count, layoutId, W, H, stage) {
@@ -177,62 +156,6 @@ function drawStageBackground(ctx, W, H, preset, sourceFrame = null) {
   ctx.restore();
 }
 
-function drawStageHookBanner(ctx, W, stage, preset) {
-  const text = String(stage.hookText || "").trim();
-  if (!text) return;
-  const s = W / 1080;
-  const x = Math.round(56 * s);
-  const y = Math.round(58 * s);
-  const w = W - x * 2;
-  const h = Math.round(234 * s);
-
-  ctx.save();
-  stageRoundRectPath(ctx, x, y, w, h, Math.round(28 * s));
-  ctx.fillStyle = "rgba(15, 20, 32, 0.88)";
-  ctx.fill();
-  ctx.lineWidth = Math.max(1, 2 * s);
-  ctx.strokeStyle = preset.accent;
-  ctx.globalAlpha = 0.55;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  const badge = String(stage.hookBadge || "DEBATE CLIP").trim().toUpperCase();
-  if (badge) {
-    const bw = Math.min(w - Math.round(64 * s), Math.round((badge.length * 14 + 48) * s));
-    const bh = Math.round(36 * s);
-    const bx = W / 2 - bw / 2;
-    const by = y + Math.round(22 * s);
-    stageRoundRectPath(ctx, bx, by, bw, bh, bh / 2);
-    ctx.fillStyle = preset.glow;
-    ctx.fill();
-    ctx.strokeStyle = preset.accent;
-    ctx.lineWidth = Math.max(1, 1.2 * s);
-    ctx.stroke();
-    ctx.font = `700 ${Math.max(8, Math.round(19 * s))}px "Inter", system-ui, sans-serif`;
-    ctx.fillStyle = "#f8fafc";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(badge, W / 2, by + bh / 2 + s);
-  }
-
-  ctx.font = `700 ${Math.max(11, Math.round(40 * s))}px "Inter", system-ui, sans-serif`;
-  ctx.fillStyle = "#f8fafc";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const lines = wrapStageLines(ctx, text, w - Math.round(72 * s), 2);
-  const lineH = Math.round(48 * s);
-  const textStartY = y + Math.round((lines.length === 1 ? 142 : 122) * s);
-  lines.forEach((line, idx) => ctx.fillText(line, W / 2, textStartY + idx * lineH));
-
-  const sub = String(stage.hookSub || "").trim();
-  if (sub) {
-    ctx.font = `500 ${Math.max(8, Math.round(24 * s))}px "Inter", system-ui, sans-serif`;
-    ctx.fillStyle = "#94a3b8";
-    ctx.fillText(sub, W / 2, y + h - Math.round(26 * s));
-  }
-  ctx.restore();
-}
-
 function drawStageDivider(ctx, W, dividerY, preset, energy) {
   const s = W / 1080;
   const marginX = Math.round(72 * s);
@@ -278,6 +201,26 @@ function drawStageSubtitleGuide(ctx, W, H, isPreview = true) {
   ctx.restore();
 }
 
+/* Preview-only guide for the empty top area that Instagram's own hook/UI uses (y 0-334 of 1920). */
+function drawStageHookGuide(ctx, W, H) {
+  const s = W / 1080;
+  const x = Math.round(72 * s), y = Math.round(24 * s);
+  const w = W - x * 2, h = Math.round(334 * s) - y - Math.round(16 * s);
+  ctx.save();
+  ctx.setLineDash([Math.round(8 * s), Math.round(6 * s)]);
+  ctx.strokeStyle = "rgba(251, 191, 36, 0.55)";
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+  stageRoundRectPath(ctx, x, y, w, h, Math.round(20 * s));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = `600 ${Math.max(7, Math.round(20 * s))}px "Inter", system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(252, 211, 77, 0.78)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("IG HOOK ZONE", W / 2, y + h / 2);
+  ctx.restore();
+}
+
 function resolveActiveSpeaker(stage, count, timestamp, energy) {
   if (count <= 1) return 0;
   if (stage.speakerFocus === "top") return 0;
@@ -287,6 +230,22 @@ function resolveActiveSpeaker(stage, count, timestamp, energy) {
   return Math.floor(timestamp / 3.5) % count;
 }
 
+/* Fallback when no speaker track exists (editor preview, face tracking off): a level per box from the simple rule above. */
+function stageFallbackLevels(stage, count, timestamp, energy) {
+  if (stage.speakerFocus === "both") return new Array(count).fill(1);
+  const idx = resolveActiveSpeaker(stage, count, timestamp, energy);
+  return Array.from({ length: count }, (_, i) => (i === idx ? 1 : 0));
+}
+
+function stageRgba(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return `rgba(255, 255, 255, ${alpha})`;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/* opts.speakerLevels: optional array (one 0..1 value per box) from the speaker track. The active card rises toward the
+   viewer (bigger, lifted, deeper shadow, accent glow and a bright top rim); the others dim while someone is talking. */
 function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts = {}) {
   const stage = normalizeStageConfig(frame.stage);
   const preset = STAGE_BG_PRESETS.find(p => p.id === stage.bg) || STAGE_BG_PRESETS[0];
@@ -297,23 +256,49 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
 
   drawStageBackground(ctx, W, H, preset, preset.id === "blurred" ? source : null);
 
-  const activeIdx = stage.activeGlow
-    ? resolveActiveSpeaker(stage, frameBoxes.length, timestamp, energy)
-    : -1;
+  const count = frameBoxes.length;
+  let levels = new Array(count).fill(0);
+  if (stage.activeGlow) {
+    levels = opts.speakerLevels && opts.speakerLevels.length === count
+      ? opts.speakerLevels
+      : stageFallbackLevels(stage, count, timestamp, energy);
+  }
+  const anySpeaking = Math.max(0, ...levels) > 0.35 && stage.speakerFocus !== "both";
+  const pulse = 0.65 + 0.35 * energy;
 
   const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
   const radius = Math.round(30 * s);
 
-  frameBoxes.forEach((box, idx) => {
-    const rect = layoutInfo.rects[idx];
-    if (!rect) return;
-    const isActive = activeIdx === idx || activeIdx === -1;
-    const m = mapBox(px(box), rect.w, rect.h, frame.fit);
+  // Draw quiet cards first and the active one last, so the raised card overlaps its neighbour cleanly.
+  const order = levels.map((_, i) => i).sort((a, b) => levels[a] - levels[b]);
+  order.forEach(idx => {
+    const base = layoutInfo.rects[idx];
+    if (!base) return;
+    const L = Math.min(1, Math.max(0, levels[idx] || 0));
+    const grow = 1 + 0.035 * L;
+    const w2 = Math.round(base.w * grow), h2 = Math.round(base.h * grow);
+    const rect = {
+      x: Math.round(base.x - (w2 - base.w) / 2),
+      y: Math.round(base.y - (h2 - base.h) / 2 - 8 * s * L),
+      w: w2, h: h2,
+    };
+    const m = mapBox(px(frameBoxes[idx]), rect.w, rect.h, frame.fit);
 
+    // Accent glow behind the card (only while speaking).
+    if (L > 0.02) {
+      ctx.save();
+      stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+      ctx.shadowColor = stageRgba(preset.accent, 0.6 * L * pulse);
+      ctx.shadowBlur = Math.round((36 + 34 * energy) * s * L + 4 * s);
+      ctx.fillStyle = "#000";
+      ctx.fill();
+      ctx.restore();
+    }
+    // Drop shadow: grows with the level, so the speaker looks closer to the viewer.
     ctx.save();
-    ctx.shadowColor = isActive && stage.activeGlow ? preset.glow : "rgba(0, 0, 0, 0.55)";
-    ctx.shadowBlur = Math.round((isActive && stage.activeGlow ? 24 + energy * 18 : 16) * s);
-    ctx.shadowOffsetY = Math.round(8 * s);
+    ctx.shadowColor = `rgba(0, 0, 0, ${0.55 + 0.25 * L})`;
+    ctx.shadowBlur = Math.round((16 + 24 * L) * s);
+    ctx.shadowOffsetY = Math.round((8 + 16 * L) * s);
     stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
     ctx.fillStyle = "#000";
     ctx.fill();
@@ -331,25 +316,43 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
     } else {
       ctx.drawImage(source, m.sx, m.sy, m.sw, m.sh, rect.x + m.dx, rect.y + m.dy, m.dw, m.dh);
     }
-    if (!isActive && stage.activeGlow && activeIdx >= 0) {
-      ctx.fillStyle = "rgba(6, 9, 15, 0.24)";
-      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    if (anySpeaking) {                       // dim the listener
+      const dim = 0.34 * (1 - L);
+      if (dim > 0.01) { ctx.fillStyle = `rgba(6, 9, 15, ${dim})`; ctx.fillRect(rect.x, rect.y, rect.w, rect.h); }
+    }
+    if (L > 0.02) {                          // soft light sheen across the top edge
+      const sheen = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h * 0.35);
+      sheen.addColorStop(0, `rgba(255, 255, 255, ${0.12 * L})`);
+      sheen.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = sheen;
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h * 0.35);
     }
     ctx.restore();
 
+    // Border: quiet grey, plus a lit rim (white at the top, accent below) that fades in with the level.
     ctx.save();
     stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
-    ctx.lineWidth = Math.max(1, (isActive && stage.activeGlow ? 3.5 + energy * 2 : 1.5) * s);
-    ctx.strokeStyle = isActive && stage.activeGlow ? preset.accent : "rgba(148, 163, 184, 0.25)";
+    ctx.lineWidth = Math.max(1, 1.5 * s);
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
     ctx.stroke();
+    if (L > 0.02) {
+      const rim = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+      rim.addColorStop(0, stageRgba("#ffffff", 0.9 * L));
+      rim.addColorStop(0.5, stageRgba(preset.accent, 0.95 * L));
+      rim.addColorStop(1, stageRgba(preset.accent, 0.6 * L));
+      ctx.lineWidth = Math.max(1, (1.5 + (2 + 1.5 * energy) * L) * s);
+      ctx.strokeStyle = rim;
+      ctx.stroke();
+    }
     ctx.restore();
   });
 
   if (stage.waveform) {
     drawStageDivider(ctx, W, layoutInfo.dividerY, preset, energy);
   }
-  if (stage.subtitleSafeZone && opts.showGuide) {
-    drawStageSubtitleGuide(ctx, W, H, true);
+  if (opts.showGuide) {
+    if (stage.hookGuide) drawStageHookGuide(ctx, W, H);
+    if (stage.subtitleSafeZone) drawStageSubtitleGuide(ctx, W, H, true);
   }
 }
 

@@ -82,3 +82,8 @@
   .ved-font-grid{grid-template-columns:repeat(4,1fr)}
   .ed-foot{margin:auto -12px 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));border-radius:0}
 }
+
+.ed-play-row{display:flex;gap:8px;margin-top:6px}
+.ed-tpl-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ed-tpl-row select{flex:1 1 140px;min-width:0;height:34px;border-radius:10px;border:1px solid var(--line, rgba(148,163,184,.3));background:var(--panel2, transparent);color:inherit;padding:0 8px}
+.ed-tpl-row input{flex:1 1 140px;min-width:0;height:34px;border-radius:10px;border:1px solid var(--line, rgba(148,163,184,.3));background:var(--panel2, transparent);color:inherit;padding:0 10px;font-size:12.5px}

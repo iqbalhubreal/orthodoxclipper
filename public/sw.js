@@ -3,13 +3,13 @@
    - Other own static files (icons, vendor/ffmpeg wrappers): stale-while-revalidate.
    - The ~31 MB ffmpeg core and mediabunny from the CDN: cached after the first download, so later cutting works offline.
    - Never touches /api/*, /__native_clip__/*, .zip downloads, non-GET requests, or anything else cross-origin (YouTube, etc). */
-const VERSION = "clipper-v1.15.3";
+const VERSION = "clipper-v1.17.1";
 const SHELL = `${VERSION}-shell`;
 const CORE = "clipper-ffmpeg-core-0.12.6"; // not tied to the app version: the engine rarely changes
 const PRECACHE = [
   "/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png",
   "/css/styles.css", "/css/editor.css", "/css/history.css",
-  ...["config", "notes", "ui", "steps", "zip", "ai", "engine", "results", "cutting", "upload", "stage", "vertical", "presets", "editor", "veditor", "theme", "pwa", "app", "history"].map(n => `/js/${n}.js`)
+  ...["config", "notes", "ui", "steps", "zip", "ai", "engine", "results", "cutting", "upload", "stage", "speaker", "vertical", "presets", "editor", "veditor", "preview", "templates", "theme", "pwa", "app", "history"].map(n => `/js/${n}.js`)
 ];
 
 self.addEventListener("install", event => {
@@ -22,7 +22,8 @@ self.addEventListener("activate", event => {
   })());
 });
 
-const isCore = url => /^(cdn\.jsdelivr\.net|unpkg\.com)$/.test(url.hostname) && (url.pathname.includes("/@ffmpeg/core@0.12.6/") || url.pathname.includes("/mediabunny@1"));
+const isCore = url => (/^(cdn\.jsdelivr\.net|unpkg\.com)$/.test(url.hostname) && (url.pathname.includes("/@ffmpeg/core@0.12.6/") || url.pathname.includes("/mediabunny@1") || url.pathname.includes("/@mediapipe/tasks-vision@0.10.14/")))
+  || (url.hostname === "storage.googleapis.com" && url.pathname.includes("/mediapipe-models/face_landmarker/"));
 
 self.addEventListener("fetch", event => {
   const req = event.request, url = new URL(req.url);
