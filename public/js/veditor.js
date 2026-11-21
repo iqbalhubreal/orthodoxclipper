@@ -1,6 +1,6 @@
 "use strict";
-/* Vertical Editor: blur boxes, image overlays, movable/resizable text & hook boxes with readable Instagram-Edits-style fonts + IG Subtitles Safe Zone guide. */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null, showIgGuide: true };
+/* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text & hook boxes, clip switcher, and Applies-to-all / Individual toggle (text always stays individual). */
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, guides: null, showIgGuide: true, scope: "all" };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -141,11 +141,14 @@ function drawVEditor() {
   const u = 1 / ved.k, W = cv.width, H = cv.height;
   ved.baseCv = ensureCanvas(ved.baseCv, W, H);
   const bctx = ved.baseCv.getContext("2d");
-  if (ved.frame && !ved.postVertical && v.videoWidth && v.videoHeight) {
+  if (ved.frame && v.videoWidth && v.videoHeight) {
     const boxes = getFrameBoxes(ved.frame), slots = getLayoutSlots(boxes.length, ved.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
     if (ved.frame.stage?.enabled && typeof drawStageComposition === "function") {
-      drawStageComposition(bctx, v, sw, sh, boxes, ved.frame, W, H, {
+      const item = state.outputs[ved.index];
+      const clipFrame = clone(ved.frame);
+      clipFrame.stage.hookText = item?.vFrame?.stage?.hookText ?? (item?.hook || item?.caption || clipFrame.stage.hookText || "");
+      drawStageComposition(bctx, v, sw, sh, boxes, clipFrame, W, H, {
         energy: 0.55,
         timestamp: Number($("#ved-time").value) || 0,
         showGuide: false,
@@ -200,19 +203,30 @@ function drawVEditor() {
     ctx.lineWidth = 2 * u; ctx.strokeStyle = "#fff"; ctx.stroke();
   });
 }
+function vedSyncClipBar() {
+  const total = state.outputs.length;
+  const item = state.outputs[ved.index];
+  $("#ved-clip-name").textContent = `${ved.index + 1} / ${total} · ${item?.title || `Clip ${ved.index + 1}`}`;
+  $("#ved-prev-clip").disabled = total <= 1 || ved.index <= 0;
+  $("#ved-next-clip").disabled = total <= 1 || ved.index >= total - 1;
+}
 function vedSyncControls() {
-  $("#ved-add-text").hidden = !ved.postVertical;
-  $("#ved-add-hook").hidden = !ved.postVertical;
+  const isIndiv = ved.scope === "individual";
+  $("#ved-add-text").hidden = !isIndiv;
+  $("#ved-add-hook").hidden = !isIndiv;
+  document.querySelectorAll("#ved-scope button").forEach(b => b.classList.toggle("on", b.dataset.scope === ved.scope));
+  vedSyncClipBar();
+
   const l = ved.layers[ved.sel];
   $("#ved-layer-tools").hidden = !l;
   if (!l) return;
   $("#ved-blur-opts").hidden = l.kind !== "blur";
-  $("#ved-text-opts").hidden = !(l.kind === "text" && ved.postVertical);
+  $("#ved-text-opts").hidden = l.kind !== "text";
   if (l.kind === "blur") {
     document.querySelectorAll("#ved-btype button").forEach(b => b.classList.toggle("on", b.dataset.btype === l.blurType));
     $("#ved-amount").value = l.amount;
     $("#ved-amount-val").textContent = l.amount;
-  } else if (l.kind === "text" && ved.postVertical) {
+  } else if (l.kind === "text") {
     $("#ved-text-input").value = l.text || "";
     $("#ved-font-size").value = l.fontSize || 32;
     $("#ved-fsize-val").textContent = l.fontSize || 32;
@@ -230,22 +244,6 @@ function vedRenderFontUI() {
     `<button type="button" class="ved-color-dot" data-color="${c}" style="background:${c}" aria-label="Color ${c}"></button>`
   ).join("");
 }
-function vedCheckedIndices() {
-  return [...document.querySelectorAll('#ved-clips input[type="checkbox"]:checked')].map(el => Number(el.value));
-}
-function vedSyncClipsCount() {
-  const boxes = [...document.querySelectorAll('#ved-clips input[type="checkbox"]')];
-  const n = boxes.filter(b => b.checked).length;
-  $("#ved-clip-count").value = Math.max(1, n);
-}
-function vedRenderClips(activeIndex) {
-  $("#ved-clips-wrap").hidden = ved.postVertical;
-  $("#ved-clip-count").max = Math.max(1, state.outputs.length);
-  $("#ved-clips").innerHTML = state.outputs.map((item, idx) =>
-    `<label class="ed-clip-opt"><input type="checkbox" value="${idx}"${idx === activeIndex ? " checked" : ""}><span>${idx + 1}. ${escapeHTML(item.title)}</span></label>`
-  ).join("");
-  vedSyncClipsCount();
-}
 function vedRenderOverlayList() {
   const saved = loadSavedOverlays();
   const html = [
@@ -256,6 +254,22 @@ function vedRenderOverlayList() {
   $("#ved-ov-count").textContent = `${saved.length}/${MAX_SAVED_OVERLAYS} saved`;
   $("#ved-import").disabled = saved.length >= MAX_SAVED_OVERLAYS;
 }
+function vedSaveLayersToState() {
+  const clean = cloneLayers(ved.layers);
+  if (ved.scope === "individual") {
+    if (state.outputs[ved.index]) state.outputs[ved.index].vLayers = clean;
+    return;
+  }
+  // Applies to all: apply non-text layers (blur/image) to every clip, keeping every clip's text layers strictly individual
+  const sharedNonText = clean.filter(l => l.kind !== "text");
+  const curText = clean.filter(l => l.kind === "text");
+  state.outputs.forEach((out, idx) => {
+    const existingText = idx === ved.index
+      ? curText
+      : cloneLayers((out.vLayers || []).filter(l => l.kind === "text"));
+    out.vLayers = [...cloneLayers(sharedNonText), ...existingText];
+  });
+}
 function vedAddBlur() {
   ved.layers.push({ kind: "blur", blurType: "smooth", amount: 18, x: 0.15, y: 0.43, w: 0.7, h: 0.14 });
   ved.sel = ved.layers.length - 1;
@@ -263,7 +277,7 @@ function vedAddBlur() {
   drawVEditor();
 }
 function vedAddText(isHook = false) {
-  if (!ved.postVertical) return;
+  if (ved.scope !== "individual") return;
   const item = state.outputs[ved.index];
   const defaultHook = item?.hook || item?.caption || "Wait... What do you think?";
   ved.layers.push({
@@ -300,6 +314,29 @@ function vedAddImageOverlay(id) {
   };
   img.src = ov.url;
 }
+async function loadVedClip(i) {
+  const item = state.outputs[i];
+  if (!item) return;
+  const v = ved.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.url });
+  await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
+  ved.index = i;
+  ved.guides = null;
+  ved.layers = await preloadLayerImages(cloneLayers(item.vLayers));
+  ved.sel = ved.layers.length ? 0 : -1;
+  const slider = $("#ved-time");
+  slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
+  $("#ved-title").textContent = "Vertical Editor";
+  vedSyncControls();
+  await vedSeek(Number(slider.value));
+  drawVEditor();
+}
+async function switchVedClip(delta) {
+  const next = clamp(ved.index + delta, 0, state.outputs.length - 1);
+  if (next === ved.index) return;
+  vedSaveLayersToState();
+  try { await loadVedClip(next); }
+  catch { toast("Could not load that clip.", true); }
+}
 async function openVerticalEditor(i, opts = {}) {
   if (!IS_ANDROID_APP) {
     toast("Download the Android app for this feature.", true);
@@ -309,35 +346,19 @@ async function openVerticalEditor(i, opts = {}) {
   }
   const item = state.outputs[i];
   if (!item || state.busy) return;
-  const postVertical = !!opts.postVertical && !!item.vUrl;
-  const src = postVertical ? item.vUrl : item.url;
-  if (!src) return;
-  const v = ved.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src });
   try {
-    await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
-    ved.index = i;
-    ved.postVertical = postVertical;
-    ved.frame = postVertical ? null : clone(opts.frame || item.vFrame || state.lastFrame || defaultFrame());
+    ved.frame = clone(opts.frame || item.vFrame || state.lastFrame || defaultFrame());
     ved.returnToEditor = !!opts.returnToEditor;
-    ved.guides = null;
     ved.showIgGuide = $("#ved-ig-guide") ? $("#ved-ig-guide").checked : true;
-    ved.layers = postVertical ? [] : await preloadLayerImages(cloneLayers(item.vLayers));
-    ved.sel = ved.layers.length ? 0 : -1;
-    const slider = $("#ved-time");
-    slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
-    $("#ved-title").textContent = `Vertical Editor: ${item.title}`;
     const cv = $("#ved-canvas");
     cv.width = 540; cv.height = 960;
-    $("#ved-stage").style.maxWidth = "calc(46dvh * 0.5625)";
+    $("#ved-stage").style.maxWidth = "calc(44dvh * 0.5625)";
     vedRenderFontUI();
     vedRenderOverlayList();
-    vedRenderClips(i);
-    vedSyncControls();
+    await loadVedClip(i);
     $("#veditor").hidden = false;
     $("#veditor").scrollTop = 0;
     document.body.style.overflow = "hidden";
-    await vedSeek(Number(slider.value));
-    drawVEditor();
   } catch { toast("Could not open this clip in Vertical Editor.", true); }
 }
 function closeVerticalEditor(reopenFraming = false) {
@@ -439,61 +460,15 @@ vedCanvas.addEventListener("pointermove", e => {
 });
 ["pointerup", "pointercancel"].forEach(t => vedCanvas.addEventListener(t, () => { ved.drag = null; ved.guides = null; drawVEditor(); }));
 
-async function exportPostVerticalEdits(i, layers) {
-  const item = state.outputs[i];
-  const mb = await getMediabunny();
-  if (!mb) throw new Error("Hardware video editor is unavailable on this device.");
-  const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
-  const W = 1080, H = 1920;
-  const loaded = await preloadLayerImages(layers);
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.vBlob) });
-  const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-  let canvas = null, ctx = null, baseCv = null, baseCtx = null;
-  try {
-    const conversion = await Conversion.init({
-      input,
-      output,
-      video: {
-        codec: "avc",
-        bitrate: 5_000_000,
-        hardwareAcceleration: "prefer-hardware",
-        processedWidth: W,
-        processedHeight: H,
-        process: (sample) => {
-          if (!ctx) {
-            canvas = ensureCanvas(null, W, H);
-            ctx = canvas.getContext("2d", { alpha: false });
-            baseCv = ensureCanvas(null, W, H);
-            baseCtx = baseCv.getContext("2d", { alpha: false });
-          }
-          sample.draw(baseCtx, 0, 0, W, H);
-          ctx.drawImage(baseCv, 0, 0, W, H);
-          drawVerticalLayers(ctx, baseCv, W, H, loaded);
-          return canvas;
-        },
-      },
-    });
-    if (!conversion.isValid) throw new Error("Could not initialize vertical export.");
-    conversion.onProgress = p => setBar(p);
-    state.activeConversion = conversion;
-    await conversion.execute();
-    const vBlob = new Blob([output.target.buffer], { type: "video/mp4" });
-    if (item.vUrl) URL.revokeObjectURL(item.vUrl);
-    item.vBlob = vBlob;
-    item.vUrl = URL.createObjectURL(vBlob);
-    const box = $(`#vbox-${i}`);
-    const vid = box.querySelector("video");
-    const dl = box.querySelector("a[download]");
-    if (vid) vid.src = item.vUrl;
-    if (dl) dl.href = item.vUrl;
-    if (typeof syncHistory === "function") await syncHistory(true);
-  } finally {
-    state.activeConversion = null;
-    try { input.dispose?.(); } catch {}
-  }
-}
-
 $("#ved-time").addEventListener("input", async e => { await vedSeek(Number(e.target.value)); drawVEditor(); });
+$("#ved-prev-clip")?.addEventListener("click", () => switchVedClip(-1));
+$("#ved-next-clip")?.addEventListener("click", () => switchVedClip(1));
+$("#ved-scope")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-scope]");
+  if (!b) return;
+  ved.scope = b.dataset.scope === "individual" ? "individual" : "all";
+  vedSyncControls();
+});
 $("#ved-ig-guide")?.addEventListener("change", e => { ved.showIgGuide = e.target.checked; drawVEditor(); });
 $("#ved-add-blur").addEventListener("click", vedAddBlur);
 $("#ved-add-text").addEventListener("click", () => vedAddText(false));
@@ -597,33 +572,11 @@ $("#ved-ov-list").addEventListener("click", e => {
   const pick = e.target.closest("[data-ov-add]");
   if (pick) vedAddImageOverlay(pick.dataset.ovAdd);
 });
-$("#ved-clips").addEventListener("change", vedSyncClipsCount);
-$("#ved-clip-count").addEventListener("input", e => {
-  const n = clamp(Number(e.target.value) || 1, 1, state.outputs.length);
-  document.querySelectorAll('#ved-clips input[type="checkbox"]').forEach((b, idx) => { b.checked = idx < n; });
-});
-$("#ved-pick-all").addEventListener("click", () => {
-  const boxes = [...document.querySelectorAll('#ved-clips input[type="checkbox"]')];
-  const allOn = boxes.every(b => b.checked);
-  boxes.forEach(b => { b.checked = !allOn; });
-  vedSyncClipsCount();
-});
 $("#ved-back").addEventListener("click", () => closeVerticalEditor(true));
 $("#ved-save").addEventListener("click", () => {
-  if (ved.postVertical) {
-    if (!ved.layers.length) return closeVerticalEditor(false);
-    const i = ved.index, layers = cloneLayers(ved.layers);
-    closeVerticalEditor(false);
-    state.clipTotal = 1;
-    runTask(() => exportPostVerticalEdits(i, layers), "Rendering vertical edits...");
-    return;
-  }
-  const list = vedCheckedIndices();
-  if (!list.length) return toast("Select at least one clip to save edits to.", true);
-  const clean = cloneLayers(ved.layers);
-  list.forEach(idx => {
-    if (state.outputs[idx]) state.outputs[idx].vLayers = cloneLayers(clean);
-  });
-  toast(`Saved edits to ${list.length} clip${list.length === 1 ? "" : "s"}. Click Move Back to export.`);
+  vedSaveLayersToState();
+  toast(ved.scope === "all"
+    ? "Blur & overlays applied to all clips (text stays individual). Click Move Back to export."
+    : `Saved edits to clip ${ved.index + 1}. Click Move Back to export.`);
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#veditor").hidden) closeVerticalEditor(true); });

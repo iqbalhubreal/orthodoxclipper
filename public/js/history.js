@@ -1,5 +1,5 @@
 "use strict";
-/* History stored in this browser. On mobile, retains only the most recent session's exported clips locally in IndexedDB and displays them for playback/download/re-editing. */
+/* History stored in this browser. On mobile, retains only the most recent session's exported clips locally in IndexedDB and provides an Import button to restore them into the main workspace. */
 const HIST_KEY = "clipper.history";
 const MOBILE_CACHE = IS_MOBILE || IS_ANDROID_APP;
 const IDB_NAME = "orthodoxclipper_latest";
@@ -122,8 +122,6 @@ function localClipHTML(hRec, vRec) {
   const btns = [];
   if (hRec) btns.push(`<a class="btn" href="${hUrl}" download="${escapeHTML(hRec.name || "clip.mp4")}" data-h-dl="h">Download MP4</a>`);
   if (vRec) btns.push(`<a class="btn primary" href="${vUrl}" download="${escapeHTML(vRec.name || "clip-vertical.mp4")}" data-h-dl="v">Download vertical MP4</a>`);
-  if (hRec) btns.push(`<button class="btn" type="button" data-h="make-vert">${vRec ? "Redo vertical" : "Make vertical"}</button>`);
-  if (vRec) btns.push(`<button class="btn" type="button" data-h="edit-vert">Edit vertical</button>`);
   return `<div class="clip" style="margin-top:10px;padding:0;border:0;background:transparent">
       <video class="${vRec ? "vertical" : ""}" controls playsinline preload="metadata" src="${mainUrl}"></video>
     </div>
@@ -133,12 +131,16 @@ function entryHTML(e, idx, localClips) {
   const open = histOpen.has(e.id), clips = e.clips || [];
   const when = new Date(e.ts).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   const link = /^https?:\/\//i.test(e.url || "") ? `<a href="${escapeHTML(e.url)}" target="_blank" rel="noopener">${escapeHTML(e.url)}</a>` : escapeHTML(e.url || "No YouTube link saved");
+  const hasLocal = idx === 0 && clips.some((_, j) => localClips.has(`h_${j}`) || localClips.has(`v_${j}`));
   let body = "";
   if (open) {
     body = `<div class="h-body">
       ${e.fileName ? `<p class="hint">Video file: ${escapeHTML(e.fileName)}</p>` : ""}
       <details><summary>Pasted notes</summary><pre>${escapeHTML(e.notes || "")}</pre></details>
-      <div class="clip-actions"><button class="btn" type="button" data-h="reuse">Use these notes again</button></div>
+      <div class="clip-actions">
+        ${hasLocal ? `<button class="btn primary" type="button" data-h="import">Import</button>` : ""}
+        <button class="btn" type="button" data-h="reuse">Use these notes again</button>
+      </div>
       ${clips.map((c, j) => {
         const hRec = idx === 0 ? localClips.get(`h_${j}`) : null;
         const vRec = idx === 0 ? localClips.get(`v_${j}`) : null;
@@ -200,7 +202,7 @@ async function restoreHistorySession(entryId) {
       const box = $(`#vbox-${idx}`);
       if (box) {
         box.hidden = false;
-        box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a><button class="btn" data-vedit="${idx}" type="button">Edit vertical</button></div>`;
+        box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a></div>`;
       }
       const btn = document.querySelector(`button[data-vert="${idx}"]`);
       if (btn) btn.textContent = "Redo vertical";
@@ -217,7 +219,7 @@ async function renderHistory() {
   const notice = $("#h-notice");
   if (notice) {
     notice.textContent = MOBILE_CACHE
-      ? "Mobile storage notice: only clips from your most recent exported session are retained locally for playback and re-editing."
+      ? "Mobile storage notice: only clips from your most recent exported session are retained locally for playback and import."
       : "Saved in this browser (videos are not stored).";
   }
   $("#h-clear").hidden = !list.length;
@@ -271,13 +273,12 @@ $("#h-list").addEventListener("click", async e => {
     $("#notes").value = entry.notes || ""; $("#yt").value = entry.url || "";
     notesChanged(); renderPrompt(); renderDetected(); closeHistory(); openStep(3); window.scrollTo({ top: 0, behavior: "smooth" });
     toast("Notes and link restored. Upload the video again to cut.");
-  } else if (kind === "make-vert" || kind === "edit-vert") {
-    const j = Number(btn.closest(".h-clip")?.dataset.hc) || 0;
+  } else if (kind === "import") {
     const ok = await restoreHistorySession(id);
-    if (!ok) return toast("Saved video clip was not found on this device.", true);
+    if (!ok) return toast("Saved clips were not found on this device.", true);
     closeHistory();
-    if (kind === "edit-vert") openVerticalEditor(j, { postVertical: true });
-    else openEditor(j);
+    $("#results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    toast("Clips imported into the main workspace.");
   } else if (kind === "copy") {
     const cap = getCap(btn.closest(".h-clip").querySelector(".cap-block").dataset.src);
     if (cap) copyText(`${cap.caption}\n\n${cap.tagsText}`, "Caption and hashtags copied.");

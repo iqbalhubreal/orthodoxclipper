@@ -16,6 +16,9 @@
 .ed-layout-seg button{min-height:32px;font-size:11.5px;padding:4px 8px}
 .ed-side,.ed-tools,.ved-tools{display:flex;flex-direction:column;gap:10px}
 .ed-box-btns{display:flex;gap:4px}
+.ved-clip-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 auto 8px;max-width:340px;padding:4px 6px;border:1px solid var(--line);border-radius:10px;background:var(--field)}
+.ved-clip-bar .btn{width:34px;height:30px;padding:0;font-size:18px;line-height:1;flex:none}
+.ved-clip-name{flex:1;min-width:0;text-align:center;font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stage-card{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:11px;padding:9px;background:var(--field)}
 .stage-bg-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .stage-bg-dot{height:28px;border-radius:8px;border:2px solid var(--line);cursor:pointer;padding:0}
@@ -35,8 +38,6 @@
 .ved-ov-pick img{width:34px;height:22px;object-fit:contain;background:#000;border-radius:4px;flex:none}
 .ved-ov-pick span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ved-ov-del{flex:none;width:28px;height:28px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--bad-soft);cursor:pointer;font-size:12px}
-.ved-count-wrap{display:flex;align-items:center;gap:6px}
-.ved-count-wrap input{width:48px;padding:2px 5px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);font-size:12px;text-align:center}
 .ved-text-input{width:100%;resize:vertical;min-height:54px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);font-size:13.5px}
 .ved-font-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
 .ved-font-btn{padding:7px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);cursor:pointer;font-size:12.5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

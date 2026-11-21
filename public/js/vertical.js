@@ -176,10 +176,15 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
 }
 async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
-  item.vFrame = clone(frame);
-  const useWebCodecs = IS_ANDROID_APP || !!frame.stage?.enabled;
+  const clipFrame = clone(frame);
+  if (clipFrame.stage && i !== ed.index) {
+    // Text in 2.5D stage always remains individual per clip, never copied by Apply to all
+    clipFrame.stage.hookText = item.vFrame?.stage?.hookText ?? (item.hook || item.caption || "");
+  }
+  item.vFrame = clone(clipFrame);
+  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled;
   let vBlob = useWebCodecs
-    ? await Promise.race([makeVerticalWebCodecs(item, frame, onProgress), state.cancelPromise])
+    ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress), state.cancelPromise])
     : null;
   if (!vBlob) {
     const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
@@ -187,7 +192,7 @@ async function makeVertical(ff, i, frame, onProgress) {
     const tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
     await engine.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
     const code = await Promise.race([engine.exec([
-      "-i", tmpIn, "-filter_complex", verticalFilter(frame), "-map", "[v]", "-map", "0:a?",
+      "-i", tmpIn, "-filter_complex", verticalFilter(clipFrame), "-map", "[v]", "-map", "0:a?",
       "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut
     ]), state.cancelPromise]);
     if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);
@@ -201,7 +206,7 @@ async function makeVertical(ff, i, frame, onProgress) {
   item.vName = item.name.replace(/\.mp4$/, "") + "-vertical.mp4";
   const box = $(`#vbox-${i}`);
   box.hidden = false;
-  box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a><button class="btn" data-vedit="${i}" type="button">Edit vertical</button></div>`;
+  box.innerHTML = `<div class="caption-label">Vertical version</div><video class="vertical" controls playsinline preload="metadata" src="${item.vUrl}"></video><div class="clip-actions"><a class="btn primary" href="${item.vUrl}" download="${escapeHTML(item.vName)}">Download vertical MP4</a></div>`;
   const btn = document.querySelector(`button[data-vert="${i}"]`);
   if (btn) btn.textContent = "Redo vertical";
   updateResultsHeader();

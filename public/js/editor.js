@@ -94,7 +94,8 @@ async function openEditor(i) {
     ed.index = i; ed.sel = 0;
     const rawFrame = clone(item.vFrame || state.lastFrame || defaultFrame());
     const stage = typeof normalizeStageConfig === "function" ? normalizeStageConfig(rawFrame.stage, item) : { enabled: false };
-    if (!stage.hookText) stage.hookText = item.hook || item.caption || "";
+    // Hook text is strictly individual per clip
+    stage.hookText = item.vFrame?.stage?.hookText ?? (item.hook || item.caption || "");
     ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame), stage };
     const slider = $("#ed-time");
     slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
