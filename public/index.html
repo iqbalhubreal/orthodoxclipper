@@ -97,7 +97,7 @@
 <div id="busy-mini" role="status" aria-live="polite" hidden><div class="spinner busy-mini-spin"></div><div class="busy-mini-info"><div id="busy-mini-text">Working...</div><div id="busy-mini-clock" aria-hidden="true">0:00.0</div></div><button id="busy-max" class="btn" type="button">Show</button></div>
 <div id="editor" role="dialog" aria-modal="true" aria-labelledby="ed-title" hidden><div class="ed-box">
   <div class="ed-top"><h3 id="ed-title">Vertical Maker</h3><button id="ed-cancel" class="btn ed-x" type="button" aria-label="Close">✕</button></div>
-  <details class="ed-help"><summary>How to use</summary><p class="hint">Adjust 1 to 4 cropping boxes (default is 2). Drag inside a box to move it, or drag any dot to resize. Use <b>Open Vertical Editor</b> to add blur and overlays, then select clips and export.</p></details>
+  <details class="ed-help"><summary>How to use</summary><p class="hint">Adjust 1 to 4 cropping boxes (default is 2). Enable <b>2.5D Debate Stage</b> for studio backgrounds, a top debate hook, center creator logo, audio-reactive glow, and a clean safe zone for Instagram Edits AI subtitles.</p></details>
   <div class="ed-body">
     <div>
       <div class="ed-stage" id="ed-stage"><canvas id="ed-canvas"></canvas></div>
@@ -110,6 +110,23 @@
     <div class="ed-side">
       <canvas id="ed-prev" width="180" height="320"></canvas>
       <div class="ed-tools">
+        <div>
+          <p class="ed-cap">Stage style</p>
+          <div class="ed-seg" id="ed-stage-mode" role="group" aria-label="Stage style"><button type="button" data-stage="0" class="on">Classic</button><button type="button" data-stage="1">2.5D Stage</button></div>
+        </div>
+        <div id="ed-stage-opts" class="stage-card" hidden>
+          <p class="ed-cap">Background preset</p>
+          <div id="ed-stage-bg" class="stage-bg-grid"></div>
+          <label class="stage-field"><span>Top debate hook (for muted viewers)</span><input id="ed-hook-text" type="text" maxlength="140" placeholder="Wait... Was Abraham Actually a Muslim?"></label>
+          <label class="stage-field"><span>Hook badge</span><input id="ed-hook-badge" type="text" maxlength="28" placeholder="DEBATE CLIP"></label>
+          <label class="stage-field"><span>Center creator logo</span><select id="ed-stage-logo"><option value="">None (waveform only)</option></select></label>
+          <label class="stage-field"><span>Active speaker glow</span><select id="ed-stage-focus"><option value="auto">Auto pulse</option><option value="top">Top speaker</option><option value="bottom">Bottom speaker</option><option value="both">Both lit</option></select></label>
+          <div class="stage-toggles">
+            <label class="stage-chk"><input id="ed-stage-wave" type="checkbox" checked><span>Waveform</span></label>
+            <label class="stage-chk"><input id="ed-stage-glow" type="checkbox" checked><span>Glow</span></label>
+            <label class="stage-chk"><input id="ed-stage-subzone" type="checkbox" checked><span>IG Subtitles Zone</span></label>
+          </div>
+        </div>
         <div>
           <div class="ed-clips-head"><p class="ed-cap">Cropping boxes (<span id="ed-box-count">2</span>/4)</p><div class="ed-box-btns"><button id="ed-add-box" class="btn ed-mini" type="button">+ Box</button><button id="ed-del-box" class="btn ed-mini del" type="button">- Box</button></div></div>
           <div class="ed-seg" id="ed-sel" role="group" aria-label="Box to edit"></div>
@@ -135,6 +152,7 @@
     </div>
     <div class="ved-tools">
       <div class="ed-tool-row"><button id="ved-add-blur" class="btn" type="button">+ Blur</button><button id="ved-add-text" class="btn" type="button" hidden>+ Text</button><button id="ved-import" class="btn" type="button">+ Image</button><input id="ved-file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden></div>
+      <label class="stage-chk" style="padding:2px 4px"><input id="ved-ig-guide" type="checkbox" checked><span>Show IG Edits AI Subtitles Safe Zone</span></label>
       <div id="ved-layer-tools" class="ved-card" hidden>
         <div id="ved-blur-opts" hidden>
           <p class="ed-cap">Blur type</p>
@@ -181,6 +199,7 @@
 <script defer src="/js/results.js"></script>
 <script defer src="/js/cutting.js"></script>
 <script defer src="/js/upload.js"></script>
+<script defer src="/js/stage.js"></script>
 <script defer src="/js/vertical.js"></script>
 <script defer src="/js/presets.js"></script>
 <script defer src="/js/editor.js"></script>

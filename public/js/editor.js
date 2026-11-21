@@ -1,8 +1,8 @@
 "use strict";
-/* Vertical framing editor (1 to 4 adjustable cropping boxes, flexible layouts, canvas, drag handles, preview, mobile layout). */
+/* Vertical framing editor (1 to 4 adjustable cropping boxes, flexible layouts, 2.5D Debate Stage, canvas, drag handles, preview, mobile layout). */
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 const BOX_COLORS = ["#8b79ff", "#42c98b", "#f0b35a", "#38bdf8"];
-const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0 };
+const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0, logoImg: null };
 
 function boxLabel(idx, count) {
   if (count === 1) return "Full";
@@ -18,6 +18,28 @@ function edSeek(t) {
     v.addEventListener("seeked", done);
     v.currentTime = Math.min(Math.max(0, t), v.duration || t);
   });
+}
+function edRenderStageControls() {
+  if (typeof STAGE_BG_PRESETS !== "undefined") {
+    $("#ed-stage-bg").innerHTML = STAGE_BG_PRESETS.map(p =>
+      `<button type="button" class="stage-bg-dot" data-bg="${p.id}" title="${escapeHTML(p.name)}" style="background:linear-gradient(135deg,${p.c1},${p.c2});box-shadow:inset 0 0 0 2px ${p.accent}55"></button>`
+    ).join("");
+  }
+  const allLogos = [
+    ...(typeof PRESET_OVERLAYS !== "undefined" ? PRESET_OVERLAYS : []),
+    ...(typeof loadSavedOverlays === "function" ? loadSavedOverlays() : []),
+  ];
+  const sel = $("#ed-stage-logo");
+  const cur = ed.frame?.stage?.centerLogoId || "";
+  sel.innerHTML = `<option value="">None (waveform only)</option>` + allLogos.map(o =>
+    `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`
+  ).join("");
+  sel.value = cur;
+}
+async function edRefreshLogo() {
+  const id = ed.frame?.stage?.centerLogoId || "";
+  ed.logoImg = id && typeof getStageLogoById === "function" ? await getStageLogoById(id) : null;
+  if (!$("#editor").hidden && state.edVideo) drawEditor();
 }
 function edSyncUI() {
   const boxes = getFrameBoxes(ed.frame);
@@ -36,6 +58,18 @@ function edSyncUI() {
     `<button type="button" data-layout="${p.id}" class="${p.id === ed.frame.layout ? "on" : ""}">${p.label}</button>`
   ).join("");
   document.querySelectorAll("#ed-fit button").forEach(b => b.classList.toggle("on", (b.dataset.fit === "fit") === !!ed.frame.fit));
+
+  const st = ed.frame.stage || (ed.frame.stage = defaultStageConfig(state.outputs[ed.index]));
+  document.querySelectorAll("#ed-stage-mode button").forEach(b => b.classList.toggle("on", (b.dataset.stage === "1") === !!st.enabled));
+  $("#ed-stage-opts").hidden = !st.enabled;
+  document.querySelectorAll("#ed-stage-bg button").forEach(b => b.classList.toggle("on", b.dataset.bg === st.bg));
+  $("#ed-hook-text").value = st.hookText || "";
+  $("#ed-hook-badge").value = st.hookBadge || "";
+  $("#ed-stage-logo").value = st.centerLogoId || "";
+  $("#ed-stage-focus").value = st.speakerFocus || "auto";
+  $("#ed-stage-wave").checked = st.waveform !== false;
+  $("#ed-stage-glow").checked = st.activeGlow !== false;
+  $("#ed-stage-subzone").checked = st.subtitleSafeZone !== false;
 }
 function edCheckedIndices() {
   return [...document.querySelectorAll('#ed-clips input[type="checkbox"]:checked')].map(el => Number(el.value));
@@ -75,14 +109,18 @@ async function openEditor(i) {
     state.vw = v.videoWidth; state.vh = v.videoHeight;
     ed.index = i; ed.sel = 0;
     const rawFrame = clone(item.vFrame || state.lastFrame || defaultFrame());
-    ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame) };
+    const stage = typeof normalizeStageConfig === "function" ? normalizeStageConfig(rawFrame.stage, item) : { enabled: false };
+    if (!stage.hookText) stage.hookText = item.hook || item.caption || "";
+    ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame), stage };
     const slider = $("#ed-time");
     slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
     $("#ed-title").textContent = `Vertical Maker: ${item.title}`;
     const cv = $("#ed-canvas");
     cv.width = Math.min(960, state.vw); cv.height = Math.round(cv.width * state.vh / state.vw);
     ed.scale = cv.width / state.vw;
+    edRenderStageControls();
     edFitStage(); edSyncUI();
+    await edRefreshLogo();
     $("#ed-clips").innerHTML = "";
     edRenderClips(i);
     $("#editor").hidden = false;
@@ -132,6 +170,15 @@ function drawEditor() {
   });
 
   const P = $("#ed-prev"), p = P.getContext("2d"), slots = getLayoutSlots(boxes.length, ed.frame.layout);
+  if (ed.frame.stage?.enabled && typeof drawStageComposition === "function") {
+    drawStageComposition(p, v, state.vw, state.vh, boxes, ed.frame, P.width, P.height, {
+      energy: 0.55,
+      timestamp: Number($("#ed-time").value) || 0,
+      logoImg: ed.logoImg,
+      showGuide: ed.frame.stage.subtitleSafeZone,
+    });
+    return;
+  }
   p.fillStyle = "#000"; p.fillRect(0, 0, P.width, P.height);
   pxBoxes.forEach((r, idx) => {
     const sl = slots[idx], dx = Math.round(sl.x * P.width), dy = Math.round(sl.y * P.height), dw = Math.round(sl.w * P.width), dh = Math.round(sl.h * P.height);
@@ -205,6 +252,24 @@ $("#ed-layout").addEventListener("click", e => {
   const b = e.target.closest("button[data-layout]"); if (!b) return;
   ed.frame.layout = b.dataset.layout; edSyncUI(); drawEditor();
 });
+$("#ed-stage-mode").addEventListener("click", e => {
+  const b = e.target.closest("button[data-stage]"); if (!b) return;
+  ed.frame.stage.enabled = b.dataset.stage === "1";
+  edSyncUI(); drawEditor();
+});
+$("#ed-stage-bg").addEventListener("click", e => {
+  const b = e.target.closest("button[data-bg]"); if (!b) return;
+  ed.frame.stage.bg = b.dataset.bg;
+  edSyncUI(); drawEditor();
+});
+$("#ed-hook-text").addEventListener("input", e => { ed.frame.stage.hookText = e.target.value; drawEditor(); });
+$("#ed-hook-badge").addEventListener("input", e => { ed.frame.stage.hookBadge = e.target.value; drawEditor(); });
+$("#ed-stage-logo").addEventListener("change", e => { ed.frame.stage.centerLogoId = e.target.value; edRefreshLogo(); });
+$("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; drawEditor(); });
+$("#ed-stage-wave").addEventListener("change", e => { ed.frame.stage.waveform = e.target.checked; drawEditor(); });
+$("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; drawEditor(); });
+$("#ed-stage-subzone").addEventListener("change", e => { ed.frame.stage.subtitleSafeZone = e.target.checked; drawEditor(); });
+
 $("#ed-add-box").addEventListener("click", () => {
   const boxes = getFrameBoxes(ed.frame);
   if (boxes.length >= 4) return;

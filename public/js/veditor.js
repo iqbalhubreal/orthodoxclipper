@@ -1,6 +1,6 @@
 "use strict";
-/* Vertical Editor: simple blur boxes (Smooth/Pixel/Frosted + Intensity), image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts. */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null };
+/* Vertical Editor: simple blur boxes (Smooth/Pixel/Frosted + Intensity), image overlays, and text boxes (post-vertical only) with 8 Instagram Edits fonts + IG Subtitles Safe Zone guide. */
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, postVertical: false, guides: null, showIgGuide: true };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -138,18 +138,30 @@ function drawVEditor() {
   if (ved.frame && !ved.postVertical && v.videoWidth && v.videoHeight) {
     const boxes = getFrameBoxes(ved.frame), slots = getLayoutSlots(boxes.length, ved.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
-    const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
-    if (ved.frame.fit) { bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H); }
-    boxes.forEach((box, idx) => {
-      const sl = slots[idx], dx = Math.round(sl.x * W), dy = Math.round(sl.y * H), dw = Math.round(sl.w * W), dh = Math.round(sl.h * H);
-      const m = mapBox(px(box), dw, dh, ved.frame.fit);
-      bctx.drawImage(v, m.sx, m.sy, m.sw, m.sh, dx + m.dx, dy + m.dy, m.dw, m.dh);
-    });
+    if (ved.frame.stage?.enabled && typeof drawStageComposition === "function") {
+      drawStageComposition(bctx, v, sw, sh, boxes, ved.frame, W, H, {
+        energy: 0.55,
+        timestamp: Number($("#ved-time").value) || 0,
+        showGuide: false,
+      });
+    } else {
+      const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
+      if (ved.frame.fit) { bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H); }
+      boxes.forEach((box, idx) => {
+        const sl = slots[idx], dx = Math.round(sl.x * W), dy = Math.round(sl.y * H), dw = Math.round(sl.w * W), dh = Math.round(sl.h * H);
+        const m = mapBox(px(box), dw, dh, ved.frame.fit);
+        bctx.drawImage(v, m.sx, m.sy, m.sw, m.sh, dx + m.dx, dy + m.dy, m.dw, m.dh);
+      });
+    }
   } else {
     bctx.drawImage(v, 0, 0, W, H);
   }
   ctx.drawImage(ved.baseCv, 0, 0, W, H);
   drawVerticalLayers(ctx, ved.baseCv, W, H, ved.layers);
+
+  if (ved.showIgGuide && typeof drawStageSubtitleGuide === "function") {
+    drawStageSubtitleGuide(ctx, W, H, true);
+  }
 
   if (ved.guides) {
     ctx.save();
@@ -284,6 +296,7 @@ async function openVerticalEditor(i, opts = {}) {
     ved.frame = postVertical ? null : clone(opts.frame || item.vFrame || state.lastFrame || defaultFrame());
     ved.returnToEditor = !!opts.returnToEditor;
     ved.guides = null;
+    ved.showIgGuide = $("#ved-ig-guide") ? $("#ved-ig-guide").checked : true;
     ved.layers = postVertical ? [] : await preloadLayerImages(cloneLayers(item.vLayers));
     ved.sel = ved.layers.length ? 0 : -1;
     const slider = $("#ved-time");
@@ -460,6 +473,7 @@ async function exportPostVerticalEdits(i, layers) {
 }
 
 $("#ved-time").addEventListener("input", async e => { await vedSeek(Number(e.target.value)); drawVEditor(); });
+$("#ved-ig-guide")?.addEventListener("change", e => { ved.showIgGuide = e.target.checked; drawVEditor(); });
 $("#ved-add-blur").addEventListener("click", vedAddBlur);
 $("#ved-add-text").addEventListener("click", vedAddText);
 $("#ved-btype").addEventListener("click", e => {

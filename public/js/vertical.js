@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical split-screen (1-4 cropping boxes + flexible layouts): Web uses ffmpeg.wasm; Android app uses WebCodecs hardware rendering (1080x1920) with FFmpeg fallback. */
+/* Vertical split-screen (1-4 cropping boxes + flexible layouts + 2.5D Debate Stage): Web uses WebCodecs/ffmpeg.wasm; Android app uses WebCodecs hardware rendering (1080x1920) with FFmpeg fallback. */
 const ASPECT = 9 / 8;
 const clone = o => JSON.parse(JSON.stringify(o));
 const LAYOUT_PRESETS = {
@@ -46,10 +46,11 @@ function defaultBoxAt(idx, count) {
 function defaultFrame(count = 2) {
   const vw = state.vw || 16, vh = state.vh || 9;
   const h = 0.86, w = Math.min(0.47, h * ASPECT * vh / vw);
+  const stage = typeof defaultStageConfig === "function" ? defaultStageConfig() : { enabled: false };
   if (count === 2) {
-    return { fit: false, layout: "stack", boxes: [{ x: 0.03, y: 0.07, w, h }, { x: Math.max(0, 0.97 - w), y: 0.07, w, h }] };
+    return { fit: false, layout: "stack", boxes: [{ x: 0.03, y: 0.07, w, h }, { x: Math.max(0, 0.97 - w), y: 0.07, w, h }], stage };
   }
-  return { fit: false, layout: getLayoutPresets(count)[0].id, boxes: Array.from({ length: count }, (_, idx) => defaultBoxAt(idx, count)) };
+  return { fit: false, layout: getLayoutPresets(count)[0].id, boxes: Array.from({ length: count }, (_, idx) => defaultBoxAt(idx, count)), stage };
 }
 function verticalFilter(f) {
   const boxes = getFrameBoxes(f), slots = getLayoutSlots(boxes.length, f.layout), W = 1080, TOTAL_H = 1920;
@@ -88,13 +89,20 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
-  const W = 1080, TOTAL_H = 1920;
+  const W = 1080, TOTAL_H = 1920, FPS = 30;
   const frameBoxes = getFrameBoxes(frame);
   const slots = getLayoutSlots(frameBoxes.length, frame.layout);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
+  const stageEnabled = !!(frame.stage?.enabled && typeof drawStageComposition === "function");
+  const audioEnv = stageEnabled && (frame.stage.waveform || frame.stage.activeGlow)
+    ? await extractAudioEnvelope(item.blob, FPS)
+    : null;
+  const logoImg = stageEnabled && frame.stage.centerLogoId
+    ? await getStageLogoById(frame.stage.centerLogoId)
+    : null;
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-  let ctx = null, baseCv = null, baseCtx = null, boxes = null;
+  let ctx = null, baseCv = null, baseCtx = null, boxes = null, sw = 0, sh = 0, frameCount = 0;
   try {
     const conversion = await Conversion.init({
       input,
@@ -107,7 +115,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
         processedHeight: TOTAL_H,
         process: (sample) => {
           if (!ctx) {
-            const sw = sample.displayWidth, sh = sample.displayHeight;
+            sw = sample.displayWidth; sh = sample.displayHeight;
             const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
             boxes = frameBoxes.map((box, idx) => {
               const s = slots[idx];
@@ -131,14 +139,27 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
             }
           }
           const targetCtx = baseCtx || ctx;
-          if (frame.fit) { targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H); }
-          for (const { m, xOff, yOff } of boxes) {
-            sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
+          if (stageEnabled) {
+            const ts = typeof sample.timestamp === "number" ? sample.timestamp : frameCount / FPS;
+            const envIdx = audioEnv ? Math.min(audioEnv.length - 1, Math.max(0, Math.floor(ts * FPS))) : 0;
+            const energy = audioEnv ? audioEnv[envIdx] : (0.28 + 0.2 * Math.abs(Math.sin(ts * 4)));
+            drawStageComposition(targetCtx, sample, sw, sh, frameBoxes, frame, W, TOTAL_H, {
+              energy,
+              timestamp: ts,
+              logoImg,
+              showGuide: false,
+            });
+          } else {
+            if (frame.fit) { targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H); }
+            for (const { m, xOff, yOff } of boxes) {
+              sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
+            }
           }
           if (layers.length) {
             ctx.drawImage(baseCv, 0, 0, W, TOTAL_H);
             drawVerticalLayers(ctx, baseCv, W, TOTAL_H, layers);
           }
+          frameCount++;
           return ctx.canvas;
         },
       },
@@ -160,7 +181,8 @@ async function makeVerticalWebCodecs(item, frame, onProgress) {
 async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
   item.vFrame = clone(frame);
-  let vBlob = IS_ANDROID_APP
+  const useWebCodecs = IS_ANDROID_APP || !!frame.stage?.enabled;
+  let vBlob = useWebCodecs
     ? await Promise.race([makeVerticalWebCodecs(item, frame, onProgress), state.cancelPromise])
     : null;
   if (!vBlob) {
