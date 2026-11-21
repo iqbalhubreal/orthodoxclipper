@@ -79,8 +79,8 @@ function getStageLayoutBoxes(count, layoutId, W, H, stage) {
   const gap = Math.round(72 * s);
   const smallGap = Math.round(22 * s);
   const hasHook = !!(stage?.hookText && stage.hookText.trim());
-  const topY = hasHook ? Math.round(316 * s) : Math.round(96 * s);
-  const bottomLimit = stage?.subtitleSafeZone ? Math.round(1420 * s) : Math.round(1790 * s);
+  const topY = hasHook ? Math.round(334 * s) : Math.round(108 * s);
+  const bottomLimit = stage?.subtitleSafeZone ? Math.round(1425 * s) : Math.round(1790 * s);
   const availW = W - padX * 2;
   const availH = Math.max(Math.round(420 * s), bottomLimit - topY);
 
@@ -182,9 +182,9 @@ function drawStageHookBanner(ctx, W, stage, preset) {
   if (!text) return;
   const s = W / 1080;
   const x = Math.round(56 * s);
-  const y = Math.round(58 * s);
+  const y = Math.round(92 * s);
   const w = W - x * 2;
-  const h = Math.round(234 * s);
+  const h = Math.round(220 * s);
 
   ctx.save();
   stageRoundRectPath(ctx, x, y, w, h, Math.round(28 * s));
@@ -199,36 +199,36 @@ function drawStageHookBanner(ctx, W, stage, preset) {
   const badge = String(stage.hookBadge || "DEBATE CLIP").trim().toUpperCase();
   if (badge) {
     const bw = Math.min(w - Math.round(64 * s), Math.round((badge.length * 14 + 48) * s));
-    const bh = Math.round(36 * s);
+    const bh = Math.round(34 * s);
     const bx = W / 2 - bw / 2;
-    const by = y + Math.round(22 * s);
+    const by = y + Math.round(24 * s);
     stageRoundRectPath(ctx, bx, by, bw, bh, bh / 2);
     ctx.fillStyle = preset.glow;
     ctx.fill();
     ctx.strokeStyle = preset.accent;
     ctx.lineWidth = Math.max(1, 1.2 * s);
     ctx.stroke();
-    ctx.font = `700 ${Math.max(8, Math.round(19 * s))}px "Inter", system-ui, sans-serif`;
+    ctx.font = `700 ${Math.max(8, Math.round(18 * s))}px "Inter", system-ui, sans-serif`;
     ctx.fillStyle = "#f8fafc";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(badge, W / 2, by + bh / 2 + s);
   }
 
-  ctx.font = `700 ${Math.max(11, Math.round(40 * s))}px "Inter", system-ui, sans-serif`;
+  ctx.font = `700 ${Math.max(11, Math.round(39 * s))}px "Inter", system-ui, sans-serif`;
   ctx.fillStyle = "#f8fafc";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const lines = wrapStageLines(ctx, text, w - Math.round(72 * s), 2);
-  const lineH = Math.round(48 * s);
-  const textStartY = y + Math.round((lines.length === 1 ? 142 : 122) * s);
+  const lineH = Math.round(46 * s);
+  const textStartY = y + Math.round((lines.length === 1 ? 136 : 116) * s);
   lines.forEach((line, idx) => ctx.fillText(line, W / 2, textStartY + idx * lineH));
 
   const sub = String(stage.hookSub || "").trim();
   if (sub) {
     ctx.font = `500 ${Math.max(8, Math.round(24 * s))}px "Inter", system-ui, sans-serif`;
     ctx.fillStyle = "#94a3b8";
-    ctx.fillText(sub, W / 2, y + h - Math.round(26 * s));
+    ctx.fillText(sub, W / 2, y + h - Math.round(24 * s));
   }
   ctx.restore();
 }
