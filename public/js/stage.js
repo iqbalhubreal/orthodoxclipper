@@ -1,6 +1,7 @@
 "use strict";
-/* 2.5D Debate Stage renderer: studio backgrounds, empty top space for Instagram, rounded speaker cards, audio-reactive glow & waveform, and Instagram Edits subtitle safe zone. */
+/* Stage renderer: 2.5D Stage, Versus, Glass, Cinema, Study, PiP, and Broadcast designs. Keeps top space empty for Instagram and bottom clear for IG Edits AI subtitles. */
 
+const STAGE_STYLES = ["classic", "2.5d", "versus", "glass", "cinema", "study", "pip", "broadcast"];
 const STAGE_BG_PRESETS = [
   { id: "midnight", name: "Midnight Studio", c1: "#090d16", c2: "#131c2e", accent: "#38bdf8", glow: "rgba(56, 189, 248, 0.20)", grid: "rgba(255, 255, 255, 0.045)" },
   { id: "amber", name: "Warm Podcast", c1: "#120c08", c2: "#24160e", accent: "#f59e0b", glow: "rgba(245, 158, 11, 0.20)", grid: "rgba(255, 224, 180, 0.04)" },
@@ -12,21 +13,26 @@ const STAGE_BG_PRESETS = [
 function defaultStageConfig(item = null) {
   return {
     enabled: false,
+    style: "classic",
     bg: "midnight",
     waveform: true,
     activeGlow: true,
     subtitleSafeZone: true,
-    hookGuide: true, // preview-only dashed guide for the empty top area (never rendered into the exported video)
-    speakerFocus: "auto", // "auto" | "top" | "bottom" | "both"
-    detectSpeaker: !(typeof IS_MOBILE !== "undefined" && IS_MOBILE), // follow the real speaker (face tracking), when focus is "auto"
+    hookGuide: true,
+    speakerFocus: "auto",
+    detectSpeaker: !(typeof IS_MOBILE !== "undefined" && IS_MOBILE),
   };
 }
 
 function normalizeStageConfig(raw, item = null) {
   const base = defaultStageConfig(item);
   if (!raw || typeof raw !== "object") return base;
+  let style = STAGE_STYLES.includes(raw.style) ? raw.style : (raw.enabled ? "2.5d" : "classic");
+  const enabled = raw.style ? style !== "classic" : !!raw.enabled;
+  if (enabled && style === "classic") style = "2.5d";
   return {
-    enabled: !!raw.enabled,
+    enabled,
+    style,
     bg: STAGE_BG_PRESETS.some(p => p.id === raw.bg) ? raw.bg : base.bg,
     waveform: raw.waveform !== false,
     activeGlow: raw.activeGlow !== false,
@@ -57,11 +63,27 @@ function getStageLayoutBoxes(count, layoutId, W, H, stage) {
   const padX = Math.round(64 * s);
   const gap = Math.round(72 * s);
   const smallGap = Math.round(22 * s);
-  // Keep top area empty for Instagram editing
   const topY = Math.round(334 * s);
   const bottomLimit = stage?.subtitleSafeZone ? Math.round(1425 * s) : Math.round(1790 * s);
   const availW = W - padX * 2;
   const availH = Math.max(Math.round(420 * s), bottomLimit - topY);
+
+  if (stage?.style === "pip" && count >= 2) {
+    const pipW = Math.round(300 * s);
+    const pipH = Math.round(370 * s);
+    const margin = Math.round(24 * s);
+    const rects = [{ x: padX, y: topY, w: availW, h: availH }];
+    for (let i = 1; i < count; i++) {
+      const col = i - 1;
+      rects.push({
+        x: Math.round(W - padX - margin - pipW - col * (pipW + Math.round(16 * s))),
+        y: Math.round(bottomLimit - margin - pipH),
+        w: pipW,
+        h: pipH,
+      });
+    }
+    return { rects, dividerY: bottomLimit + Math.round(18 * s), topY, bottomLimit };
+  }
 
   if (count === 1) {
     return {
@@ -114,7 +136,93 @@ function getStageLayoutBoxes(count, layoutId, W, H, stage) {
   };
 }
 
-function drawStageBackground(ctx, W, H, preset, sourceFrame = null) {
+function drawStageBackground(ctx, W, H, preset, stage, timestamp, sourceFrame = null) {
+  const style = stage.style || "2.5d";
+
+  if (style === "cinema") {
+    ctx.fillStyle = "#0b0c0f";
+    ctx.fillRect(0, 0, W, H);
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.45, W * 0.15, W * 0.5, H * 0.45, W * 0.9);
+    vig.addColorStop(0, "rgba(255,255,255,0.035)");
+    vig.addColorStop(1, "rgba(0,0,0,0.65)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+
+  if (style === "study") {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, "#140c07");
+    grad.addColorStop(0.5, "#1f130c");
+    grad.addColorStop(1, "#0b0704");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    const spot = ctx.createRadialGradient(W * 0.5, H * 0.12, W * 0.04, W * 0.5, H * 0.36, W * 0.88);
+    spot.addColorStop(0, "rgba(251, 191, 36, 0.22)");
+    spot.addColorStop(0.5, "rgba(217, 119, 6, 0.08)");
+    spot.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = spot;
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+
+  if (style === "broadcast") {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, "#0b1120");
+    grad.addColorStop(0.5, "#151f33");
+    grad.addColorStop(1, "#090e1a");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    const step = Math.round(W / 16);
+    ctx.save();
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.045)";
+    ctx.lineWidth = Math.max(1, W / 1080);
+    ctx.beginPath();
+    for (let x = step; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  if (style === "versus") {
+    ctx.fillStyle = "#08090f";
+    ctx.fillRect(0, 0, W, H);
+    const topGlow = ctx.createRadialGradient(W * 0.5, H * 0.30, W * 0.04, W * 0.5, H * 0.30, W * 0.68);
+    topGlow.addColorStop(0, "rgba(56, 189, 248, 0.24)");
+    topGlow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = topGlow;
+    ctx.fillRect(0, 0, W, H);
+    const botGlow = ctx.createRadialGradient(W * 0.5, H * 0.62, W * 0.04, W * 0.5, H * 0.62, W * 0.68);
+    botGlow.addColorStop(0, "rgba(244, 63, 94, 0.24)");
+    botGlow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = botGlow;
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+
+  if (style === "glass") {
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, "#0b1020");
+    grad.addColorStop(0.5, "#121830");
+    grad.addColorStop(1, "#090d18");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    const t = timestamp * 0.6;
+    const orbs = [
+      { x: W * (0.28 + 0.12 * Math.sin(t)), y: H * (0.30 + 0.06 * Math.cos(t * 0.8)), r: W * 0.55, c: "rgba(99, 102, 241, 0.24)" },
+      { x: W * (0.72 + 0.12 * Math.cos(t * 0.7)), y: H * (0.60 + 0.06 * Math.sin(t * 0.9)), r: W * 0.52, c: "rgba(56, 189, 248, 0.20)" },
+    ];
+    for (const o of orbs) {
+      const og = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
+      og.addColorStop(0, o.c);
+      og.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = og;
+      ctx.fillRect(0, 0, W, H);
+    }
+    return;
+  }
+
+  // Default 2.5D / PiP studio background
   const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, preset.c1);
   grad.addColorStop(0.5, preset.c2);
@@ -144,28 +252,64 @@ function drawStageBackground(ctx, W, H, preset, sourceFrame = null) {
   ctx.strokeStyle = preset.grid;
   ctx.lineWidth = Math.max(1, W / 1080);
   ctx.beginPath();
-  for (let x = step; x < W; x += step) {
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, H);
-  }
-  for (let y = step; y < H; y += step) {
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-  }
+  for (let x = step; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let y = step; y < H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
   ctx.stroke();
   ctx.restore();
 }
 
-function drawStageDivider(ctx, W, dividerY, preset, energy) {
+function drawStageDivider(ctx, W, dividerY, preset, energy, style = "2.5d") {
   const s = W / 1080;
   const marginX = Math.round(72 * s);
+
+  if (style === "versus") {
+    const grad = ctx.createLinearGradient(marginX, 0, W - marginX, 0);
+    grad.addColorStop(0, "rgba(56, 189, 248, 0.15)");
+    grad.addColorStop(0.5, `rgba(255, 255, 255, ${0.55 + 0.45 * energy})`);
+    grad.addColorStop(1, "rgba(244, 63, 94, 0.15)");
+    ctx.save();
+    ctx.fillStyle = grad;
+    const h = Math.max(2, Math.round((3 + energy * 4) * s));
+    stageRoundRectPath(ctx, marginX, dividerY - h / 2, W - marginX * 2, h, h / 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  if (style === "cinema") {
+    const totalW = W - marginX * 2;
+    const activeW = Math.max(Math.round(32 * s), Math.round(totalW * (0.2 + 0.8 * energy)));
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.fillRect(marginX, dividerY - Math.round(2 * s), totalW, Math.round(4 * s));
+    ctx.fillStyle = "rgba(248, 250, 252, 0.78)";
+    ctx.fillRect((W - activeW) / 2, dividerY - Math.round(2 * s), activeW, Math.round(4 * s));
+    ctx.restore();
+    return;
+  }
+
+  if (style === "broadcast") {
+    const barW = W - marginX * 2;
+    const barH = Math.round(10 * s);
+    const grad = ctx.createLinearGradient(marginX, 0, W - marginX, 0);
+    grad.addColorStop(0, "#1e293b");
+    grad.addColorStop(0.5, preset.accent);
+    grad.addColorStop(1, "#1e293b");
+    ctx.save();
+    stageRoundRectPath(ctx, marginX, dividerY - barH / 2, barW, barH, barH / 2);
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.55 + 0.4 * energy;
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
   const bars = 44;
   const totalW = W - marginX * 2;
   const step = totalW / bars;
   const bw = Math.max(2, step * 0.52);
-
   ctx.save();
-  ctx.fillStyle = preset.accent;
+  ctx.fillStyle = style === "study" ? "#f59e0b" : preset.accent;
   for (let i = 0; i < bars; i++) {
     const norm = i / (bars - 1);
     const envelope = Math.sin(norm * Math.PI);
@@ -201,7 +345,6 @@ function drawStageSubtitleGuide(ctx, W, H, isPreview = true) {
   ctx.restore();
 }
 
-/* Preview-only guide for the empty top area that Instagram's own hook/UI uses (y 0-334 of 1920). */
 function drawStageHookGuide(ctx, W, H) {
   const s = W / 1080;
   const x = Math.round(72 * s), y = Math.round(24 * s);
@@ -230,7 +373,6 @@ function resolveActiveSpeaker(stage, count, timestamp, energy) {
   return Math.floor(timestamp / 3.5) % count;
 }
 
-/* Fallback when no speaker track exists (editor preview, face tracking off): a level per box from the simple rule above. */
 function stageFallbackLevels(stage, count, timestamp, energy) {
   if (stage.speakerFocus === "both") return new Array(count).fill(1);
   const idx = resolveActiveSpeaker(stage, count, timestamp, energy);
@@ -244,17 +386,16 @@ function stageRgba(hex, alpha) {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-/* opts.speakerLevels: optional array (one 0..1 value per box) from the speaker track. The active card rises toward the
-   viewer (bigger, lifted, deeper shadow, accent glow and a bright top rim); the others dim while someone is talking. */
 function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts = {}) {
   const stage = normalizeStageConfig(frame.stage);
+  const style = stage.style || "2.5d";
   const preset = STAGE_BG_PRESETS.find(p => p.id === stage.bg) || STAGE_BG_PRESETS[0];
   const s = W / 1080;
   const energy = Math.min(1, Math.max(0, opts.energy ?? 0.45));
   const timestamp = opts.timestamp ?? 0;
   const layoutInfo = getStageLayoutBoxes(frameBoxes.length, frame.layout, W, H, stage);
 
-  drawStageBackground(ctx, W, H, preset, preset.id === "blurred" ? source : null);
+  drawStageBackground(ctx, W, H, preset, stage, timestamp, preset.id === "blurred" ? source : null);
 
   const count = frameBoxes.length;
   let levels = new Array(count).fill(0);
@@ -267,38 +408,46 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
   const pulse = 0.65 + 0.35 * energy;
 
   const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
-  const radius = Math.round(30 * s);
+  const radius = Math.round((style === "cinema" ? 10 : style === "broadcast" ? 16 : 30) * s);
 
-  // Draw quiet cards first and the active one last, so the raised card overlaps its neighbour cleanly.
-  const order = levels.map((_, i) => i).sort((a, b) => levels[a] - levels[b]);
+  const order = style === "pip"
+    ? levels.map((_, i) => i)
+    : levels.map((_, i) => i).sort((a, b) => levels[a] - levels[b]);
+
   order.forEach(idx => {
     const base = layoutInfo.rects[idx];
     if (!base) return;
     const L = Math.min(1, Math.max(0, levels[idx] || 0));
-    const grow = 1 + 0.035 * L;
+    const lift = (style === "cinema" || style === "pip") ? 0 : 0.035 * L;
+    const grow = 1 + lift;
     const w2 = Math.round(base.w * grow), h2 = Math.round(base.h * grow);
     const rect = {
       x: Math.round(base.x - (w2 - base.w) / 2),
-      y: Math.round(base.y - (h2 - base.h) / 2 - 8 * s * L),
+      y: Math.round(base.y - (h2 - base.h) / 2 - (lift ? 8 * s * L : 0)),
       w: w2, h: h2,
     };
     const m = mapBox(px(frameBoxes[idx]), rect.w, rect.h, frame.fit);
 
-    // Accent glow behind the card (only while speaking).
-    if (L > 0.02) {
+    const cardAccent = style === "versus"
+      ? (idx === 0 ? "#38bdf8" : "#f43f5e")
+      : style === "study"
+        ? "#fbbf24"
+        : preset.accent;
+
+    if (L > 0.02 && style !== "cinema" && style !== "broadcast") {
       ctx.save();
       stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
-      ctx.shadowColor = stageRgba(preset.accent, 0.6 * L * pulse);
+      ctx.shadowColor = stageRgba(cardAccent, 0.62 * L * pulse);
       ctx.shadowBlur = Math.round((36 + 34 * energy) * s * L + 4 * s);
       ctx.fillStyle = "#000";
       ctx.fill();
       ctx.restore();
     }
-    // Drop shadow: grows with the level, so the speaker looks closer to the viewer.
+
     ctx.save();
-    ctx.shadowColor = `rgba(0, 0, 0, ${0.55 + 0.25 * L})`;
-    ctx.shadowBlur = Math.round((16 + 24 * L) * s);
-    ctx.shadowOffsetY = Math.round((8 + 16 * L) * s);
+    ctx.shadowColor = `rgba(0, 0, 0, ${style === "glass" ? 0.68 : 0.55 + 0.25 * L})`;
+    ctx.shadowBlur = Math.round((style === "glass" ? 36 : 16 + 24 * L) * s);
+    ctx.shadowOffsetY = Math.round((style === "glass" ? 14 : 8 + 16 * L) * s);
     stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
     ctx.fillStyle = "#000";
     ctx.fill();
@@ -316,39 +465,55 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
     } else {
       ctx.drawImage(source, m.sx, m.sy, m.sw, m.sh, rect.x + m.dx, rect.y + m.dy, m.dw, m.dh);
     }
-    if (anySpeaking) {                       // dim the listener
-      const dim = 0.34 * (1 - L);
+    if (anySpeaking && style !== "pip") {
+      const dim = (style === "cinema" ? 0.22 : 0.34) * (1 - L);
       if (dim > 0.01) { ctx.fillStyle = `rgba(6, 9, 15, ${dim})`; ctx.fillRect(rect.x, rect.y, rect.w, rect.h); }
     }
-    if (L > 0.02) {                          // soft light sheen across the top edge
+    if (L > 0.02 && style !== "cinema") {
       const sheen = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h * 0.35);
-      sheen.addColorStop(0, `rgba(255, 255, 255, ${0.12 * L})`);
+      sheen.addColorStop(0, `rgba(255, 255, 255, ${(style === "glass" ? 0.18 : 0.12) * L})`);
       sheen.addColorStop(1, "rgba(255, 255, 255, 0)");
       ctx.fillStyle = sheen;
       ctx.fillRect(rect.x, rect.y, rect.w, rect.h * 0.35);
     }
+    if (style === "broadcast" && L > 0.05) {
+      const stripW = Math.round(10 * s);
+      ctx.fillStyle = stageRgba(cardAccent, 0.95 * L);
+      ctx.fillRect(rect.x, rect.y, stripW, rect.h);
+    }
     ctx.restore();
 
-    // Border: quiet grey, plus a lit rim (white at the top, accent below) that fades in with the level.
     ctx.save();
     stageRoundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
-    ctx.lineWidth = Math.max(1, 1.5 * s);
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+    ctx.lineWidth = Math.max(1, (style === "cinema" ? 1 : 1.5) * s);
+    ctx.strokeStyle = style === "glass"
+      ? "rgba(255, 255, 255, 0.28)"
+      : style === "pip" && idx > 0
+        ? stageRgba(cardAccent, 0.85)
+        : "rgba(148, 163, 184, 0.25)";
     ctx.stroke();
-    if (L > 0.02) {
+
+    if (style === "glass") {
+      ctx.beginPath();
+      ctx.moveTo(rect.x + radius, rect.y + s);
+      ctx.lineTo(rect.x + rect.w - radius, rect.y + s);
+      ctx.lineWidth = Math.max(1, 1.5 * s);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.stroke();
+    } else if (L > 0.02 && style !== "broadcast") {
       const rim = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-      rim.addColorStop(0, stageRgba("#ffffff", 0.9 * L));
-      rim.addColorStop(0.5, stageRgba(preset.accent, 0.95 * L));
-      rim.addColorStop(1, stageRgba(preset.accent, 0.6 * L));
-      ctx.lineWidth = Math.max(1, (1.5 + (2 + 1.5 * energy) * L) * s);
+      rim.addColorStop(0, stageRgba("#ffffff", (style === "cinema" ? 0.5 : 0.9) * L));
+      rim.addColorStop(0.5, stageRgba(cardAccent, 0.95 * L));
+      rim.addColorStop(1, stageRgba(cardAccent, 0.6 * L));
+      ctx.lineWidth = Math.max(1, ((style === "cinema" ? 1.5 : 1.5 + (2 + 1.5 * energy) * L)) * s);
       ctx.strokeStyle = rim;
       ctx.stroke();
     }
     ctx.restore();
   });
 
-  if (stage.waveform) {
-    drawStageDivider(ctx, W, layoutInfo.dividerY, preset, energy);
+  if (stage.waveform && style !== "pip") {
+    drawStageDivider(ctx, W, layoutInfo.dividerY, preset, energy, style);
   }
   if (opts.showGuide) {
     if (stage.hookGuide) drawStageHookGuide(ctx, W, H);

@@ -111,11 +111,20 @@
     <div class="ed-side">
       <canvas id="ed-prev" width="180" height="320"></canvas>
       <div class="ed-tools">
-        <div>
+        <div class="span-full">
           <p class="ed-cap">Stage style</p>
-          <div class="ed-seg" id="ed-stage-mode" role="group" aria-label="Stage style"><button type="button" data-stage="0" class="on">Classic</button><button type="button" data-stage="1">2.5D Stage</button></div>
+          <div class="ed-seg ed-seg-grid" id="ed-stage-mode" role="group" aria-label="Stage style">
+            <button type="button" data-style="classic" class="on">Classic</button>
+            <button type="button" data-style="2.5d">2.5D Stage</button>
+            <button type="button" data-style="versus">Versus</button>
+            <button type="button" data-style="glass">Glass</button>
+            <button type="button" data-style="cinema">Cinema</button>
+            <button type="button" data-style="study">Study</button>
+            <button type="button" data-style="pip">PiP</button>
+            <button type="button" data-style="broadcast">Broadcast</button>
+          </div>
         </div>
-        <div><p class="ed-cap">Box shape in video</p><div class="ed-seg" id="ed-fit" role="group" aria-label="Fill or fit"><button type="button" data-fit="fill" class="on">Fill</button><button type="button" data-fit="fit">Fit</button></div></div>
+        <div class="span-full"><p class="ed-cap">Box shape in video</p><div class="ed-seg" id="ed-fit" role="group" aria-label="Fill or fit"><button type="button" data-fit="fill" class="on">Fill</button><button type="button" data-fit="fit">Fit</button></div></div>
         <div id="ed-stage-opts" class="stage-card span-full" hidden>
           <p class="ed-cap">Background preset</p>
           <div id="ed-stage-bg" class="stage-bg-grid"></div>

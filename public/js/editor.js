@@ -45,7 +45,8 @@ function edSyncUI() {
   document.querySelectorAll("#ed-fit button").forEach(b => b.classList.toggle("on", (b.dataset.fit === "fit") === !!ed.frame.fit));
 
   const st = ed.frame.stage || (ed.frame.stage = defaultStageConfig(state.outputs[ed.index]));
-  document.querySelectorAll("#ed-stage-mode button").forEach(b => b.classList.toggle("on", (b.dataset.stage === "1") === !!st.enabled));
+  const curStyle = st.enabled ? (st.style && st.style !== "classic" ? st.style : "2.5d") : "classic";
+  document.querySelectorAll("#ed-stage-mode button").forEach(b => b.classList.toggle("on", b.dataset.style === curStyle));
   $("#ed-stage-opts").hidden = !st.enabled;
   document.querySelectorAll("#ed-stage-bg button").forEach(b => b.classList.toggle("on", b.dataset.bg === st.bg));
   $("#ed-stage-focus").value = st.speakerFocus || "auto";
@@ -235,8 +236,10 @@ $("#ed-layout").addEventListener("click", e => {
   ed.frame.layout = b.dataset.layout; edSyncUI(); drawEditor();
 });
 $("#ed-stage-mode").addEventListener("click", e => {
-  const b = e.target.closest("button[data-stage]"); if (!b) return;
-  ed.frame.stage.enabled = b.dataset.stage === "1";
+  const b = e.target.closest("button[data-style]"); if (!b) return;
+  const style = b.dataset.style || "classic";
+  ed.frame.stage.style = style;
+  ed.frame.stage.enabled = style !== "classic";
   edSyncUI(); drawEditor();
 });
 $("#ed-stage-bg").addEventListener("click", e => {
