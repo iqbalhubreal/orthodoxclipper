@@ -1,5 +1,5 @@
 "use strict";
-/* Vertical split-screen (1-4 cropping boxes + flexible layouts + 2.5D Debate Stage): Web uses WebCodecs/ffmpeg.wasm; Android app uses WebCodecs hardware rendering (1080x1920) with FFmpeg fallback. */
+/* Vertical split-screen (1-4 cropping boxes + flexible layouts + 2.5D Debate Stage + 3D Phone Animator): Web uses WebCodecs/ffmpeg.wasm; Android app uses WebCodecs hardware rendering (1080x1920) with FFmpeg fallback. */
 const ASPECT = 9 / 8;
 const clone = o => JSON.parse(JSON.stringify(o));
 const LAYOUT_PRESETS = {
@@ -103,22 +103,21 @@ function verticalFilter(f) {
 async function runTask(fn, message) {
   if (state.busy) return;
   state.cancelled = false;
-  state.abort = new AbortController();
   state.cancelPromise = new Promise((_, reject) => { state.rejectCancel = () => reject(new Error("Cancelled")); });
   state.cancelPromise.catch(() => {});
   showBusy(true, message);
   await keepAwake(true);
-  try { await fn(); toast("Vertical clips ready."); $("#status").textContent = "Vertical clips ready."; }
+  try { await fn(); toast("Vertical clips ready."); }
   catch (error) {
-    if (state.cancelled) { toast("Cancelled."); $("#status").textContent = "Vertical conversion cancelled."; }
-    else { console.error(error); toast(error.message || String(error), true); $("#status").textContent = "Vertical conversion failed."; }
+    if (state.cancelled) toast("Cancelled.");
+    else { console.error(error); toast(error.message || String(error), true); }
   } finally {
     state.progressMessage = ""; state.clipTotal = 0; setBar(0);
     await keepAwake(false);
     showBusy(false);
   }
 }
-async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
+async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, animCfg = null) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
@@ -127,12 +126,13 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
   const slots = getLayoutSlots(frameBoxes.length, frame.layout);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
   const stageEnabled = !!(frame.stage?.enabled && typeof drawStageComposition === "function");
+  const animEnabled = !!(animCfg?.enabled && typeof animatorRenderAt === "function");
   const audioEnv = preEnv || (stageEnabled && frame.stage.activeGlow
     ? await extractAudioEnvelope(item.blob, FPS)
     : null);
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-  let ctx = null, baseCv = null, baseCtx = null, boxes = null, sw = 0, sh = 0, frameCount = 0;
+  let ctx = null, baseCv = null, baseCtx = null, animSrcCv = null, animSrcCtx = null, boxes = null, sw = 0, sh = 0, frameCount = 0;
   try {
     const conversion = await Conversion.init({
       input,
@@ -167,10 +167,17 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
               baseCtx.imageSmoothingEnabled = true;
               baseCtx.imageSmoothingQuality = "medium";
             }
+            if (animEnabled) {
+              animSrcCv = Object.assign(document.createElement("canvas"), { width: W, height: TOTAL_H });
+              animSrcCtx = animSrcCv.getContext("2d", { alpha: false });
+              animSrcCtx.imageSmoothingEnabled = true;
+              animSrcCtx.imageSmoothingQuality = "medium";
+            }
           }
-          const targetCtx = baseCtx || ctx;
+          const ts = typeof sample.timestamp === "number" ? sample.timestamp : frameCount / FPS;
+          const compCtx = animEnabled ? animSrcCtx : ctx;
+          const targetCtx = baseCtx || compCtx;
           if (stageEnabled) {
-            const ts = typeof sample.timestamp === "number" ? sample.timestamp : frameCount / FPS;
             const envIdx = audioEnv ? Math.min(audioEnv.length - 1, Math.max(0, Math.floor(ts * FPS))) : 0;
             const energy = audioEnv ? audioEnv[envIdx] : (0.28 + 0.2 * Math.abs(Math.sin(ts * 4)));
             drawStageComposition(targetCtx, sample, sw, sh, frameBoxes, frame, W, TOTAL_H, {
@@ -185,13 +192,17 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
             drawDividerLines(targetCtx, W, TOTAL_H, frame);
           }
           if (layers.length) {
-            ctx.drawImage(baseCv, 0, 0, W, TOTAL_H);
-            drawVerticalLayers(ctx, baseCv, W, TOTAL_H, layers);
+            compCtx.drawImage(baseCv, 0, 0, W, TOTAL_H);
+            drawVerticalLayers(compCtx, baseCv, W, TOTAL_H, layers);
+          }
+          if (animEnabled) {
+            animatorRenderAt(ts, ctx, animSrcCv, animCfg, W, TOTAL_H);
           }
           frameCount++;
           return ctx.canvas;
         },
       },
+      audio: { codec: "aac" },
     });
     if (!conversion.isValid) return null;
     if (onProgress) conversion.onProgress = onProgress;
@@ -238,13 +249,15 @@ async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
   const clipFrame = clone(frame);
   item.vFrame = clone(clipFrame);
-  const _vedPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs().ved : { speed: 1, voiceBoost: false };
+  const _allPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { ved: { speed: 1, voiceBoost: false }, anim: { enabled: false } };
+  const _vedPrefs = _allPrefs.ved;
+  const animCfg = clone(item.vAnim || _allPrefs.anim || { enabled: false });
   const speed = typeof clampSpeed === "function" ? clampSpeed(item.vSpeed ?? _vedPrefs.speed ?? 1) : 1;
   const voiceBoost = item.vVoiceBoost !== undefined ? !!item.vVoiceBoost : !!_vedPrefs.voiceBoost;
   const hasSpeed = Math.abs(speed - 1) >= 0.01;
-  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled;
+  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled || !!animCfg.enabled;
   let vBlob = useWebCodecs
-    ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress), state.cancelPromise])
+    ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress, null, animCfg), state.cancelPromise])
     : null;
   if (vBlob && (hasSpeed || voiceBoost)) {
     vBlob = await applyAudioSpeedFFmpeg(ff, i, vBlob, speed, voiceBoost);
@@ -287,7 +300,6 @@ async function makeVerticalBatch(indices, frame) {
   for (let n = 0; n < indices.length; n++) {
     state.clipIndex = n;
     state.progressMessage = `Making clip ${indices[n] + 1} vertical (${n + 1} of ${indices.length})...`;
-    $("#status").textContent = state.progressMessage;
     showBusy(true, state.progressMessage); setBar(n / indices.length);
     await makeVertical(state.ffmpeg, indices[n], frame, p => setBar((n + p) / indices.length));
   }

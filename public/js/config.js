@@ -26,6 +26,23 @@ const MAX_BEFORE = 60;
 const PREFS_KEY = "clipper.prefs.v1";
 const clampSpeed = v => Math.round(Math.min(2, Math.max(0.5, Number(v) || 1)) * 10) / 10;
 
+function defaultAnimPrefs() {
+  return {
+    enabled: false,
+    scope: "all",
+    color: 0xc5d5e4,
+    ti: false,
+    surface: "wood",
+    showCase: false,
+    startAt: 1.5,
+    rest: 4,
+    pose: "flat",
+    sticker: true,
+    stickerPreset: "follow",
+    stickerText: "Follow for more clips",
+  };
+}
+
 function defaultClipperPrefs() {
   return {
     maxlen: "3",
@@ -36,6 +53,7 @@ function defaultClipperPrefs() {
       speed: 1,
       voiceBoost: false,
     },
+    anim: defaultAnimPrefs(),
   };
 }
 
@@ -52,6 +70,20 @@ function loadClipperPrefs() {
       base.ved.speed = clampSpeed(raw.ved.speed);
       base.ved.voiceBoost = !!raw.ved.voiceBoost;
     }
+    if (raw.anim && typeof raw.anim === "object") {
+      base.anim.enabled = !!raw.anim.enabled;
+      base.anim.scope = raw.anim.scope === "individual" ? "individual" : "all";
+      if (Number.isFinite(Number(raw.anim.color))) base.anim.color = Number(raw.anim.color);
+      base.anim.ti = !!raw.anim.ti;
+      if (["wood", "marble", "concrete"].includes(raw.anim.surface)) base.anim.surface = raw.anim.surface;
+      base.anim.showCase = !!raw.anim.showCase;
+      if (Number.isFinite(Number(raw.anim.startAt))) base.anim.startAt = Math.min(6, Math.max(0, Number(raw.anim.startAt)));
+      if (Number.isFinite(Number(raw.anim.rest))) base.anim.rest = Math.min(8, Math.max(1, Number(raw.anim.rest)));
+      base.anim.pose = raw.anim.pose === "float" ? "float" : "flat";
+      base.anim.sticker = raw.anim.sticker !== false;
+      if (["follow", "subscribe", "custom"].includes(raw.anim.stickerPreset)) base.anim.stickerPreset = raw.anim.stickerPreset;
+      if (typeof raw.anim.stickerText === "string") base.anim.stickerText = raw.anim.stickerText.slice(0, 48);
+    }
   } catch {}
   return base;
 }
@@ -63,6 +95,7 @@ function saveClipperPrefs(patch) {
       ...cur,
       ...patch,
       ved: { ...cur.ved, ...(patch?.ved || {}) },
+      anim: { ...cur.anim, ...(patch?.anim || {}) },
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(next));
   } catch {}

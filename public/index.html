@@ -7,16 +7,16 @@
 <meta name="google" content="notranslate">
 <meta http-equiv="Content-Language" content="en">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>Orthodox Clipper</title>
-<script>/* apply the saved theme before first paint (no flash) */(function(){try{var t=localStorage.getItem("clipper.theme")==="light"?"light":"dark",r=document.documentElement;r.dataset.theme=t;r.dataset.themePref=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==="light"?"#ffffff":"#14151b"}catch(e){}})()</script>
+<title>The Orthodox Muslim | Clip Maker</title>
+<script>/* apply the saved theme before first paint (no flash) */(function(){try{var p=localStorage.getItem("clipper.theme")||"auto",d=matchMedia("(prefers-color-scheme: dark)").matches,t=p==="light"||(p==="auto"&&!d)?"light":"dark",r=document.documentElement;r.dataset.theme=t;r.dataset.themePref=p;var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==="light"?"#ffffff":"#14151b"}catch(e){}})()</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<meta name="application-name" content="Orthodox Clipper">
+<meta name="application-name" content="Clip Maker">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Orthodox Clipper">
+<meta name="apple-mobile-web-app-title" content="Clip Maker">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,45 +26,44 @@
 <link rel="stylesheet" href="/css/history.css">
 </head>
 <body>
-<header><div class="head"><img class="logo-img" src="/icons/icon-192.png" alt="" width="40" height="40"><div><h1>Orthodox Clipper</h1><div class="subhead">Turn timestamps into ready-to-post clips</div></div><div class="head-actions"><button id="theme-btn" class="btn theme-btn" type="button"></button><button id="open-history" class="btn header-btn" type="button">History<span class="count" id="hist-count"></span></button></div></div></header>
+<header><div class="head"><img class="logo-img" src="/icons/icon-192.png" alt="" width="40" height="40"><div><h1>The Orthodox Muslim · Clip Maker</h1><div class="subhead">Turn timestamps into ready-to-post clips</div></div><div class="head-actions"><button id="install-btn" class="btn header-btn" type="button" hidden>Install app</button><button id="theme-btn" class="btn theme-btn" type="button"></button><button id="open-history" class="btn header-btn" type="button">History<span class="count" id="hist-count"></span></button></div></div></header>
 <main>
 <section class="how" aria-label="How it works">
   <div class="how-card"><div class="how-ico">✦</div><div><h3>1. Ask Gemini</h3><p>Copy the prompt with your link.</p></div></div>
-  <div class="how-card"><div class="how-ico">⧉</div><div><h3>2. Paste answer</h3><p>Clips are detected automatically.</p></div></div>
-  <div class="how-card"><div class="how-ico">✂</div><div><h3>3. Get clips</h3><p>Upload video to cut on your device.</p></div></div>
+  <div class="how-card"><div class="how-ico">⧉</div><div><h3>2. Paste timestamps</h3><p>Drop Gemini's reply below.</p></div></div>
+  <div class="how-card"><div class="how-ico">✂</div><div><h3>3. Get clips</h3><p>Cut on your device with captions.</p></div></div>
 </section>
 <section class="panel">
   <details class="step" id="step1">
   <summary><h2 class="section-title"><span class="num">1</span>Get timestamps from Gemini</h2><span class="step-note"></span><span class="chev" aria-hidden="true"></span></summary>
   <div class="step-body">
-  <p class="hint">Paste your YouTube link, copy the prompt, then paste it into <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a>. Chat or agent mode both work.</p>
+  <p class="hint">Paste your YouTube link, copy the prompt, then paste it into <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a>.</p>
   <div class="opts" style="margin-top:12px">
     <label>YouTube link<input id="yt" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"></label>
     <label>Longest clip<select id="maxlen"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="3" selected>3 minutes</option></select></label>
   </div>
   <pre id="prompt-box" tabindex="0" aria-label="Prompt for Gemini"></pre>
   <div class="clip-actions"><button id="copy-prompt" class="btn primary" type="button">Copy prompt</button><a class="btn" href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini</a></div>
-  <p class="hint">Gemini's timestamps can be a few seconds off. Skim your clips afterwards and adjust the notes if needed.</p>
   </div>
   </details>
 
   <details class="step" id="step2" open>
-  <summary><h2 class="section-title"><span class="num" id="n2">2</span>Upload the same video</h2><span class="step-note" id="s2-note"></span><span class="chev" aria-hidden="true"></span></summary>
+  <summary><h2 class="section-title"><span class="num" id="n2">2</span>Upload video</h2><span class="step-note" id="s2-note"></span><span class="chev" aria-hidden="true"></span></summary>
   <div class="step-body">
   <label id="drop" for="file">
     <input id="file" type="file" accept="video/*" hidden>
     <span id="drop-icon">＋</span>
     <span id="file-name">Choose a video or drop it here</span>
-    <span id="file-meta">MP4, MOV, WebM and other browser-supported video files</span>
+    <span id="file-meta">MP4, MOV, WebM</span>
   </label>
   <div id="warn" class="warn" role="note" hidden></div>
   </div>
   </details>
 
   <details class="step" id="step3" open>
-  <summary><h2 class="section-title"><span class="num" id="n3">3</span>Paste Gemini's answer</h2><span class="step-note" id="s3-note"></span><span class="chev" aria-hidden="true"></span></summary>
+  <summary><h2 class="section-title"><span class="num" id="n3">3</span>Paste timestamps</h2><span class="step-note" id="s3-note"></span><span class="chev" aria-hidden="true"></span></summary>
   <div class="step-body">
-  <p class="hint" style="margin-bottom:10px">One clip per line: a time range, then the reason. Bold text, bullets and numbering from Gemini are fine. Your notes are saved in this browser.</p>
+  <p class="hint" style="margin-bottom:10px">One clip per line: time range, then the reason.</p>
   <div class="tools"><button id="paste" class="btn" type="button">Paste from clipboard</button><button id="clear" class="btn" type="button">Clear</button></div>
   <textarea id="notes" spellcheck="false" aria-label="Timestamp notes" placeholder="00:12 - 00:48 | A powerful explanation of the main point.&#10;01:04 - 01:39 | A sharp response that makes the argument clear.&#10;02:10 - 02:52 | A quiz moment with a surprising answer."></textarea>
   <div id="detected" aria-live="polite" hidden></div>
@@ -74,17 +73,17 @@
   <div class="mode-row">
     <div class="mode-label">Cutting mode</div>
     <div class="seg" role="radiogroup" aria-label="Cutting mode">
-      <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-mode="fast"><b>Fast</b><small>Ready in seconds</small></button>
-      <button type="button" class="seg-btn" role="radio" aria-checked="false" data-mode="accurate"><b>Accurate</b><small>Exact frame</small></button>
+      <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-mode="fast"><b>Fast</b><small>Quick copy</small></button>
+      <button type="button" class="seg-btn" role="radio" aria-checked="false" data-mode="accurate"><b>Accurate</b><small>Exact timestamp</small></button>
     </div>
     <input type="hidden" id="mode" value="fast">
     <p class="hint" id="mode-hint"></p>
   </div>
   <button id="go" type="button">Create clips &amp; captions</button>
   <p id="privacy">Your video stays on your device.</p>
-  <div id="app-note">
-    <a class="btn primary" href="/orthodoxclipper-apk.zip" download="Orthodox-Clipper-Android.zip">Download Android app (.zip)</a>
-    <p class="hint">For faster performance on Android. Completely secure: we never ask for any personal information.</p>
+  <div id="app-note" style="margin-top:14px;text-align:center">
+    <a class="btn" href="/orthodox-clipper-android.zip" download="Orthodox-Clipper-Android.zip">Download Android app (.zip)</a>
+    <p class="hint">For faster performance on Android. Completely secure—we never ask for any personal information.</p>
   </div>
 </section>
 <div id="status" role="status" aria-live="polite"></div>
@@ -142,7 +141,8 @@
           <div class="ed-clips-head"><p class="ed-cap">Cropping boxes (<span id="ed-box-count">2</span>/4)</p><div class="ed-box-btns"><button id="ed-add-box" class="btn ed-mini" type="button">+ Box</button><button id="ed-del-box" class="btn ed-mini del" type="button">- Box</button></div></div>
           <div class="ed-seg" id="ed-sel" role="group" aria-label="Box to edit"></div>
         </div>
-        <div class="ed-tool-row span-full"><button id="ed-swap" class="btn" type="button">Swap</button><button id="ed-reset" class="btn" type="button">Reset</button><button id="ed-overlays" class="btn" type="button">Vertical Editor</button></div>
+        <div class="ed-tool-row span-full"><button id="ed-swap" class="btn" type="button">Swap</button><button id="ed-reset" class="btn" type="button">Reset</button></div>
+        <div class="ed-tool-row span-full"><button id="ed-overlays" class="btn" type="button">Vertical Editor</button><button id="ed-animator" class="btn" type="button">Animator</button></div>
         <div class="ed-clips-wrap span-full">
           <div class="ed-clips-head"><p class="ed-cap">Clips to convert</p><button id="ed-pick-all" class="btn ed-mini" type="button">All</button></div>
           <div id="ed-clips" class="ed-clips"></div>
@@ -180,12 +180,12 @@
         <div id="ved-blur-opts" hidden>
           <p class="ed-cap">Blur type</p>
           <div class="ed-seg" id="ved-btype"><button type="button" data-btype="smooth" class="on">Smooth</button><button type="button" data-btype="pixel">Pixel</button><button type="button" data-btype="frosted">Frosted</button></div>
-          <label class="ed-time" style="margin-top:8px"><span>Intensity (<span id="ved-amount-val">18</span>)</span><input id="ved-amount" type="range" min="4" max="80" value="18"></label>
+          <label class="ed-time" style="margin-top:8px">Intensity (<span id="ved-amount-val">18</span>)<input id="ved-amount" type="range" min="4" max="80" value="18"></label>
         </div>
         <div id="ved-text-opts" hidden>
           <p class="ed-cap">Text (tap box on video to drag)</p>
           <textarea id="ved-text-input" class="ved-text-input" rows="2" placeholder="Write text..."></textarea>
-          <label class="ed-time" style="margin-top:6px"><span>Size (<span id="ved-fsize-val">32</span>px)</span><input id="ved-font-size" type="range" min="14" max="72" value="32"></label>
+          <label class="ed-time" style="margin-top:6px">Size (<span id="ved-fsize-val">32</span>px)<input id="ved-font-size" type="range" min="14" max="72" value="32"></label>
           <p class="ed-cap" style="margin-top:8px">Readable Font</p>
           <div id="ved-font-grid" class="ved-font-grid"></div>
           <div class="ved-text-style">
@@ -203,6 +203,55 @@
     </div>
   </div>
   <div class="ed-foot"><button id="ved-back" class="btn" type="button">Move Back</button><button id="ved-save" class="btn primary" type="button">Save Edits</button></div>
+</div></div>
+<div id="animator" role="dialog" aria-modal="true" aria-labelledby="anim-title" hidden><div class="ed-box">
+  <div class="ed-top"><h3 id="anim-title">Animator</h3></div>
+  <div class="ved-body">
+    <div class="ved-preview-col">
+      <div class="ved-clip-bar" id="anim-clip-bar">
+        <button id="anim-prev-clip" class="btn ed-mini" type="button" aria-label="Previous clip">‹</button>
+        <span id="anim-clip-name" class="ved-clip-name">1 / 1</span>
+        <button id="anim-next-clip" class="btn ed-mini" type="button" aria-label="Next clip">›</button>
+      </div>
+      <div class="ed-stage" id="anim-stage"><canvas id="anim-canvas"></canvas></div>
+      <div class="anim-bar" id="anim-bar" aria-hidden="true"></div>
+      <label class="ed-time"><span>Scrub animation</span><input id="anim-scrub" type="range" min="0" max="10" step="0.01" value="0"></label>
+      <div class="anim-time-row"><span id="anim-t-now">0.00 s</span><span id="anim-t-tot">0.00 s</span></div>
+      <div class="ed-play-row"><button id="anim-play" class="btn ed-mini" type="button">⏸ Pause</button><button id="anim-replay" class="btn ed-mini" type="button">↺ Replay</button><button id="anim-sound" class="btn ed-mini" type="button" aria-label="Preview sound on or off" aria-pressed="false">🔇</button></div>
+    </div>
+    <div class="ved-tools">
+      <div class="span-full">
+        <p class="ed-cap">Apply scope</p>
+        <div class="ed-seg" id="anim-scope" role="group" aria-label="Animator scope"><button type="button" data-scope="all" class="on">Applies to all</button><button type="button" data-scope="individual">Individual</button></div>
+      </div>
+      <div class="ved-card span-full">
+        <label class="stage-chk"><input id="anim-enabled" type="checkbox"><span>Enable 3D Phone Mockup</span></label>
+      </div>
+      <div id="anim-controls-wrap" class="ved-tools span-full" hidden>
+        <div class="ved-card span-full">
+          <p class="ed-cap">Phone colour</p>
+          <div class="ved-colors" id="anim-sw"></div>
+          <p class="ed-cap" style="margin-top:8px">Table surface</p>
+          <div class="ed-seg" id="anim-surf"><button type="button" data-surf="wood" class="on">Wood</button><button type="button" data-surf="marble">Marble</button><button type="button" data-surf="concrete">Concrete</button></div>
+          <div class="stage-toggles" style="margin-top:8px">
+            <label class="stage-chk"><input id="anim-case" type="checkbox"><span>Phone case</span></label>
+            <label class="stage-chk"><input id="anim-pose" type="checkbox"><span>Float &amp; rotate</span></label>
+          </div>
+        </div>
+        <div class="ved-card span-full">
+          <label class="ed-time" style="margin-top:0"><span>Start zooming out at (<span id="anim-start-val">1.5</span>s)</span><input id="anim-start" type="range" min="0" max="6" step="0.1" value="1.5"></label>
+          <label class="ed-time" style="margin-top:6px"><span>Time on table (<span id="anim-rest-val">4.0</span>s)</span><input id="anim-rest" type="range" min="1" max="8" step="0.1" value="4"></label>
+        </div>
+        <div class="ved-card span-full">
+          <label class="stage-chk"><input id="anim-stk-on" type="checkbox" checked><span>Show top sticker</span></label>
+          <p class="ed-cap" style="margin-top:8px">Sticker style</p>
+          <div class="ed-seg" id="anim-stk-presets"></div>
+          <label class="stage-field" style="margin-top:8px"><span>Sticker text</span><input id="anim-stk-txt" type="text" maxlength="48" value="Follow for more clips"></label>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ed-foot"><button id="anim-back" class="btn" type="button">Move Back</button><button id="anim-save" class="btn primary" type="button">Save</button></div>
 </div></div>
 <div id="history" role="dialog" aria-modal="true" aria-labelledby="h-title" hidden><div class="h-box">
   <div class="h-top"><h3 id="h-title">History</h3><div class="clip-actions" style="margin:0"><button id="h-clear" class="btn del" type="button">Delete all</button><button id="h-close" class="btn" type="button">Close</button></div></div>
@@ -225,6 +274,8 @@
 <script defer src="/js/presets.js"></script>
 <script defer src="/js/editor.js"></script>
 <script defer src="/js/veditor.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script defer src="/js/animator.js"></script>
 <script defer src="/js/preview.js"></script>
 <script defer src="/js/theme.js"></script>
 <script defer src="/js/pwa.js"></script>

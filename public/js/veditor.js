@@ -1,6 +1,6 @@
 "use strict";
 /* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text only in Individual mode). */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", speed: 1, voiceBoost: false };
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", speed: 1, voiceBoost: false };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -47,6 +47,37 @@ function ensureCanvas(cur, w, h) {
   if (!cur) return typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(w, h) : Object.assign(document.createElement("canvas"), { width: w, height: h });
   cur.width = w; cur.height = h;
   return cur;
+}
+function drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, blurPx, frosted) {
+  const pad = Math.min(220, Math.max(16, Math.ceil(blurPx * 2)));
+  const bw = rw + pad * 2, bh = rh + pad * 2;
+  ved.blurCv = ensureCanvas(ved.blurCv, bw, bh);
+  const bctx = ved.blurCv.getContext("2d");
+  bctx.clearRect(0, 0, bw, bh);
+
+  const sx = clamp(rx - pad, 0, W), sy = clamp(ry - pad, 0, H);
+  const sx2 = clamp(rx + rw + pad, 0, W), sy2 = clamp(ry + rh + pad, 0, H);
+  const sw = Math.max(1, sx2 - sx), sh = Math.max(1, sy2 - sy);
+  const dx = pad + (sx - rx), dy = pad + (sy - ry);
+  bctx.drawImage(baseCv, sx, sy, sw, sh, dx, dy, sw, sh);
+
+  if (dx > 0) bctx.drawImage(ved.blurCv, dx, dy, 1, sh, 0, dy, dx, sh);
+  if (dx + sw < bw) bctx.drawImage(ved.blurCv, dx + sw - 1, dy, 1, sh, dx + sw, dy, bw - (dx + sw), sh);
+  if (dy > 0) bctx.drawImage(ved.blurCv, 0, dy, bw, 1, 0, 0, bw, dy);
+  if (dy + sh < bh) bctx.drawImage(ved.blurCv, 0, dy + sh - 1, bw, 1, 0, dy + sh, bw, bh - (dy + sh));
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rx, ry, rw, rh);
+  ctx.clip();
+  ctx.filter = `blur(${blurPx}px)`;
+  ctx.drawImage(ved.blurCv, 0, 0, bw, bh, rx - pad, ry - pad, bw, bh);
+  ctx.filter = "none";
+  if (frosted) {
+    ctx.fillStyle = "rgba(15, 16, 24, 0.30)";
+    ctx.fillRect(rx, ry, rw, rh);
+  }
+  ctx.restore();
 }
 function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
   const font = VED_FONTS.find(f => f.id === l.fontId) || VED_FONTS[0];
@@ -114,18 +145,7 @@ function drawVerticalLayers(ctx, baseCv, W, H, layers) {
         ctx.drawImage(ved.pixCv, 0, 0, pw, ph, rx, ry, rw, rh);
         ctx.restore();
       } else {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(rx, ry, rw, rh);
-        ctx.clip();
-        ctx.filter = `blur(${Math.max(1, Math.round(l.amount * s))}px)`;
-        ctx.drawImage(baseCv, 0, 0, W, H);
-        ctx.filter = "none";
-        if (l.blurType === "frosted") {
-          ctx.fillStyle = "rgba(15, 16, 24, 0.30)";
-          ctx.fillRect(rx, ry, rw, rh);
-        }
-        ctx.restore();
+        drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, Math.max(1, Math.round(l.amount * s)), l.blurType === "frosted");
       }
     } else if (l.kind === "image" && l.img) {
       ctx.drawImage(l.img, rx, ry, rw, rh);
