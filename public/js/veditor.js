@@ -1,6 +1,6 @@
 "use strict";
 /* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text only in Individual mode). */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", speed: 1, voiceBoost: false };
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all" };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -228,11 +228,6 @@ function vedSyncControls() {
   $("#ved-add-text").hidden = !isIndiv;
   document.querySelectorAll("#ved-scope button").forEach(b => b.classList.toggle("on", b.dataset.scope === ved.scope));
   vedSyncClipBar();
-  const sp = typeof clampSpeed === "function" ? clampSpeed(ved.speed) : 1;
-  if ($("#ved-speed")) $("#ved-speed").value = sp;
-  if ($("#ved-speed-val")) $("#ved-speed-val").textContent = sp.toFixed(1);
-  if ($("#ved-speed-reset")) $("#ved-speed-reset").disabled = Math.abs(sp - 1) < 0.01;
-  if ($("#ved-voice-boost")) $("#ved-voice-boost").checked = !!ved.voiceBoost;
 
   if (!isIndiv && ved.layers[ved.sel]?.kind === "text") ved.sel = -1;
   const l = ved.layers[ved.sel];
@@ -272,20 +267,7 @@ function vedRenderOverlayList() {
   $("#ved-ov-count").textContent = `${saved.length}/${MAX_SAVED_OVERLAYS} saved`;
   $("#ved-import").disabled = saved.length >= MAX_SAVED_OVERLAYS;
 }
-function vedSaveAudioSpeedToState() {
-  const sp = typeof clampSpeed === "function" ? clampSpeed(ved.speed) : 1;
-  const vb = !!ved.voiceBoost;
-  if (ved.scope === "individual") {
-    if (state.outputs[ved.index]) {
-      state.outputs[ved.index].vSpeed = sp;
-      state.outputs[ved.index].vVoiceBoost = vb;
-    }
-    return;
-  }
-  state.outputs.forEach(out => { out.vSpeed = sp; out.vVoiceBoost = vb; });
-}
 function vedSaveLayersToState() {
-  vedSaveAudioSpeedToState();
   const clean = cloneLayers(ved.layers);
   if (ved.scope === "individual") {
     if (state.outputs[ved.index]) state.outputs[ved.index].vLayers = clean;
@@ -348,11 +330,8 @@ async function loadVedClip(i) {
   previewStop();
   const v = ved.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: item.url });
   await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
-  const _vedPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs().ved : { speed: 1, voiceBoost: false };
   ved.index = i;
   ved.guides = null;
-  ved.speed = typeof clampSpeed === "function" ? clampSpeed(item.vSpeed ?? _vedPrefs.speed ?? 1) : 1;
-  ved.voiceBoost = item.vVoiceBoost !== undefined ? !!item.vVoiceBoost : !!_vedPrefs.voiceBoost;
   ved.layers = await preloadLayerImages(cloneLayers(item.vLayers));
   ved.sel = ved.layers.length ? 0 : -1;
   const slider = $("#ved-time");
@@ -503,30 +482,8 @@ $("#ved-scope")?.addEventListener("click", e => {
   if (!b) return;
   ved.scope = b.dataset.scope === "individual" ? "individual" : "all";
   if (typeof saveClipperPrefs === "function") saveClipperPrefs({ ved: { scope: ved.scope } });
-  vedSaveAudioSpeedToState();
   vedSyncControls();
   drawVEditor();
-});
-$("#ved-speed")?.addEventListener("input", e => {
-  ved.speed = typeof clampSpeed === "function" ? clampSpeed(e.target.value) : Number(e.target.value) || 1;
-  if (typeof saveClipperPrefs === "function") saveClipperPrefs({ ved: { speed: ved.speed } });
-  vedSaveAudioSpeedToState();
-  vedSyncControls();
-  if (typeof previewApplyLive === "function") previewApplyLive();
-});
-$("#ved-speed-reset")?.addEventListener("click", () => {
-  ved.speed = 1;
-  if (typeof saveClipperPrefs === "function") saveClipperPrefs({ ved: { speed: 1 } });
-  vedSaveAudioSpeedToState();
-  vedSyncControls();
-  if (typeof previewApplyLive === "function") previewApplyLive();
-});
-$("#ved-voice-boost")?.addEventListener("change", e => {
-  ved.voiceBoost = e.target.checked;
-  if (typeof saveClipperPrefs === "function") saveClipperPrefs({ ved: { voiceBoost: ved.voiceBoost } });
-  vedSaveAudioSpeedToState();
-  vedSyncControls();
-  if (typeof previewApplyLive === "function") previewApplyLive();
 });
 $("#ved-add-blur").addEventListener("click", vedAddBlur);
 $("#ved-add-text").addEventListener("click", vedAddText);
@@ -633,7 +590,7 @@ $("#ved-back").addEventListener("click", () => closeVerticalEditor(true));
 $("#ved-save").addEventListener("click", () => {
   vedSaveLayersToState();
   toast(ved.scope === "all"
-    ? "Edits, speed & audio boost applied to all clips (text stays individual). Click Move Back to export."
+    ? "Edits applied to all clips (text stays individual). Click Move Back to export."
     : `Saved edits to clip ${ved.index + 1}. Click Move Back to export.`);
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#veditor").hidden) closeVerticalEditor(true); });

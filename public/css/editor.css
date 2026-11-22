@@ -32,7 +32,6 @@
 .stage-chk input{accent-color:var(--accent)}
 .ved-body{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;margin-top:10px;align-items:start}
 .ved-card{border:1px solid var(--line);border-radius:11px;padding:10px;background:var(--field)}
-.ved-speed-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .ed-divider-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .ed-divider-step{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink)}
 .ved-ov-list{display:flex;flex-direction:column;gap:6px;max-height:150px;overflow:auto}

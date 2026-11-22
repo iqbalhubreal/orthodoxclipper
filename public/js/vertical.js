@@ -218,63 +218,23 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
     try { input.dispose?.(); } catch {}
   }
 }
-function buildAudioFilter(speed, voiceBoost) {
-  const parts = [];
-  if (Math.abs(speed - 1) >= 0.01) parts.push(`atempo=${speed.toFixed(4)}`);
-  if (voiceBoost) parts.push("highpass=f=85,dynaudnorm=f=150:g=15:p=0.92:m=10,alimiter=limit=0.95");
-  return parts.join(",");
-}
-async function applyAudioSpeedFFmpeg(ff, i, blob, speed, voiceBoost) {
-  const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
-  showBusy(true, state.progressMessage);
-  const tmpIn = `vas_in_${i}.mp4`, tmpOut = `vas_out_${i}.mp4`;
-  await engine.writeFile(tmpIn, new Uint8Array(await blob.arrayBuffer()));
-  const hasSpeed = Math.abs(speed - 1) >= 0.01;
-  const af = buildAudioFilter(speed, voiceBoost);
-  const args = ["-i", tmpIn, "-map", "0:v", "-map", "0:a?"];
-  if (hasSpeed) {
-    args.push("-vf", `setpts=PTS/${speed.toFixed(4)}`, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p");
-  } else {
-    args.push("-c:v", "copy");
-  }
-  if (af) args.push("-af", af);
-  args.push("-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut);
-  const code = await Promise.race([engine.exec(args), state.cancelPromise]);
-  if (code !== 0) throw new Error(`Could not apply speed/audio to clip ${i + 1}.`);
-  const bytes = await engine.readFile(tmpOut);
-  try { await engine.deleteFile(tmpIn); await engine.deleteFile(tmpOut); } catch {}
-  return new Blob([bytes], { type: "video/mp4" });
-}
 async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
   const clipFrame = clone(frame);
   item.vFrame = clone(clipFrame);
-  const _allPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { ved: { speed: 1, voiceBoost: false }, anim: { enabled: false } };
-  const _vedPrefs = _allPrefs.ved;
+  const _allPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { anim: { enabled: false } };
   const animCfg = clone(item.vAnim || _allPrefs.anim || { enabled: false });
-  const speed = typeof clampSpeed === "function" ? clampSpeed(item.vSpeed ?? _vedPrefs.speed ?? 1) : 1;
-  const voiceBoost = item.vVoiceBoost !== undefined ? !!item.vVoiceBoost : !!_vedPrefs.voiceBoost;
-  const hasSpeed = Math.abs(speed - 1) >= 0.01;
   const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled || !!animCfg.enabled;
   let vBlob = useWebCodecs
     ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress, null, animCfg), state.cancelPromise])
     : null;
-  if (vBlob && (hasSpeed || voiceBoost)) {
-    vBlob = await applyAudioSpeedFFmpeg(ff, i, vBlob, speed, voiceBoost);
-  } else if (!vBlob) {
+  if (!vBlob) {
     const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
     showBusy(true, state.progressMessage);
     const tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
     await engine.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
-    let fc = verticalFilter(clipFrame);
-    let vMap = "[v]";
-    if (hasSpeed) {
-      fc += `;[v]setpts=PTS/${speed.toFixed(4)}[vsp]`;
-      vMap = "[vsp]";
-    }
-    const af = buildAudioFilter(speed, voiceBoost);
-    const args = ["-i", tmpIn, "-filter_complex", fc, "-map", vMap, "-map", "0:a?"];
-    if (af) args.push("-af", af);
+    const fc = verticalFilter(clipFrame);
+    const args = ["-i", tmpIn, "-filter_complex", fc, "-map", "[v]", "-map", "0:a?"];
     args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut);
     const code = await Promise.race([engine.exec(args), state.cancelPromise]);
     if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);

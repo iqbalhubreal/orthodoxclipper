@@ -99,8 +99,7 @@ async function makeClips(highlights, clips) {
     $("#busy-lap").innerHTML = state.laps.slice(-4).map(t => `<div>${escapeHTML(t)}</div>`).join("");
     const title = h.title || `Clip ${i + 1}`;
     const _prefs = loadClipperPrefs();
-    const _vedPrefs = _prefs.ved;
-    const item = { ...h, note: clips[i].note, title, blob, cutSeconds, vSpeed: _vedPrefs.speed, vVoiceBoost: _vedPrefs.voiceBoost, vAnim: clone(_prefs.anim), tagsText: tagsText(h.tags), name: `${String(i + 1).padStart(2,"0")}-${slug(title)}.mp4`, url: URL.createObjectURL(blob) };
+    const item = { ...h, note: clips[i].note, title, blob, cutSeconds, vAnim: clone(_prefs.anim), tagsText: tagsText(h.tags), name: `${String(i + 1).padStart(2,"0")}-${slug(title)}.mp4`, url: URL.createObjectURL(blob) };
     state.outputs.push(item);
     $("#clip-list").insertAdjacentHTML("beforeend", cardHTML(item, state.outputs.length - 1));
     updateResultsHeader();

@@ -24,8 +24,6 @@ const RANGE_RE = new RegExp(`(${TIME})${SEP}(${TIME})`, "i");
 const MAX_BEFORE = 60;
 
 const PREFS_KEY = "clipper.prefs.v1";
-const clampSpeed = v => Math.round(Math.min(2, Math.max(0.5, Number(v) || 1)) * 10) / 10;
-
 function defaultAnimPrefs() {
   return {
     enabled: false,
@@ -50,8 +48,6 @@ function defaultClipperPrefs() {
     frame: null,
     ved: {
       scope: "all",
-      speed: 1,
-      voiceBoost: false,
     },
     anim: defaultAnimPrefs(),
   };
@@ -67,8 +63,6 @@ function loadClipperPrefs() {
     if (raw.frame && typeof raw.frame === "object") base.frame = raw.frame;
     if (raw.ved && typeof raw.ved === "object") {
       base.ved.scope = raw.ved.scope === "individual" ? "individual" : "all";
-      base.ved.speed = clampSpeed(raw.ved.speed);
-      base.ved.voiceBoost = !!raw.ved.voiceBoost;
     }
     if (raw.anim && typeof raw.anim === "object") {
       base.anim.enabled = !!raw.anim.enabled;
