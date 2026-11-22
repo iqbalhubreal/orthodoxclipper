@@ -30,6 +30,20 @@ function getLayoutSlots(count, layoutId) {
   const presets = getLayoutPresets(count);
   return (presets.find(p => p.id === layoutId) || presets[0]).slots;
 }
+function getFrameSlots(frame) {
+  const boxes = getFrameBoxes(frame);
+  const base = getLayoutSlots(boxes.length, frame?.layout);
+  return base.map((s, idx) => {
+    const b = boxes[idx] || {};
+    const ox = Number(b.ox) || 0, oy = Number(b.oy) || 0;
+    return {
+      x: Math.min(Math.max(s.x + ox, -0.5), 1.5 - s.w),
+      y: Math.min(Math.max(s.y + oy, -0.5), 1.5 - s.h),
+      w: s.w,
+      h: s.h,
+    };
+  });
+}
 /* Optional red divider line at the junction(s) of the split screen. frame.divider (bool) turns it on; frame.dividerSize is the thickness in px on a 1080-wide video. */
 const DIVIDER_COLOR = "#e11d2e";
 function dividerThickness(f) { return Math.min(16, Math.max(2, Math.round(Number(f?.dividerSize) || 6))); }
@@ -80,7 +94,7 @@ function defaultFrame(count = 2) {
   return { fit: false, layout: getLayoutPresets(count)[0].id, boxes: Array.from({ length: count }, (_, idx) => defaultBoxAt(idx, count)), stage };
 }
 function verticalFilter(f) {
-  const boxes = getFrameBoxes(f), slots = getLayoutSlots(boxes.length, f.layout), W = 1080, TOTAL_H = 1920;
+  const boxes = getFrameBoxes(f), slots = getFrameSlots(f), W = 1080, TOTAL_H = 1920;
   const even = n => Math.max(2, Math.round(n / 2) * 2);
   const parts = boxes.map((r, idx) => {
     const slot = slots[idx], sw = even(slot.w * W), sh = even(slot.h * TOTAL_H), tag = `b${idx}`;
@@ -91,7 +105,7 @@ function verticalFilter(f) {
   });
   if (boxes.length === 1) return parts[0].replace("[b0]", "[v]");
   const inputs = boxes.map((_, idx) => `[b${idx}]`).join("");
-  const layout = slots.map(s => `${even(s.x * W)}_${even(s.y * TOTAL_H)}`).join("|");
+  const layout = slots.map(s => `${Math.max(0, even(s.x * W))}_${Math.max(0, even(s.y * TOTAL_H))}`).join("|");
   const stack = `${parts.join(";")};${inputs}xstack=inputs=${boxes.length}:layout=${layout}`;
   if (!f.divider) return `${stack}[v]`;
   const t = even(dividerThickness(f)), segs = getDividerSegments(boxes.length, f.layout);
@@ -123,7 +137,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
   const W = 1080, TOTAL_H = 1920, FPS = 30;
   const frameBoxes = getFrameBoxes(frame);
-  const slots = getLayoutSlots(frameBoxes.length, frame.layout);
+  const slots = getFrameSlots(frame);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
   const stageEnabled = !!(frame.stage?.enabled && typeof drawStageComposition === "function");
   const animEnabled = !!(animCfg?.enabled && typeof animatorRenderAt === "function");
@@ -189,7 +203,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
               timestamp: ts,
             });
           } else {
-            if (frame.fit) { targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H); }
+            targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H);
             for (const { m, xOff, yOff } of boxes) {
               sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
             }

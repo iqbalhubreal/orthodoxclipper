@@ -411,14 +411,14 @@ function animComposeBase(v, ts) {
   if (!anim.baseCv) anim.baseCv = Object.assign(document.createElement("canvas"), { width: W, height: H });
   const bctx = anim.baseCv.getContext("2d");
   if (anim.frame && v && v.videoWidth && v.videoHeight) {
-    const boxes = getFrameBoxes(anim.frame), slots = getLayoutSlots(boxes.length, anim.frame.layout);
+    const boxes = getFrameBoxes(anim.frame), slots = typeof getFrameSlots === "function" ? getFrameSlots(anim.frame) : getLayoutSlots(boxes.length, anim.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
     if (anim.frame.stage?.enabled && typeof drawStageComposition === "function") {
       const opts = typeof previewStageOpts === "function" ? previewStageOpts(state.outputs[anim.index], anim.frame, ts) : { energy: 0.55, timestamp: ts };
       drawStageComposition(bctx, v, sw, sh, boxes, anim.frame, W, H, { ...opts, showGuide: false });
     } else {
       const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
-      if (anim.frame.fit) { bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H); }
+      bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H);
       boxes.forEach((box, idx) => {
         const sl = slots[idx], dx = Math.round(sl.x * W), dy = Math.round(sl.y * H), dw = Math.round(sl.w * W), dh = Math.round(sl.h * H);
         const m = mapBox(px(box), dw, dh, anim.frame.fit);

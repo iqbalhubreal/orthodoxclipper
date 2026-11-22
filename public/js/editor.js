@@ -3,7 +3,7 @@
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 const BOX_COLORS = ["#8b79ff", "#42c98b", "#f0b35a", "#38bdf8"];
 const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0, undo: [] };
-const ED_NUDGE = 0.02;
+const ED_NUDGE = 0.005;
 
 function boxLabel(idx, count) {
   if (count === 1) return "Full";
@@ -51,10 +51,11 @@ function edNudgeBox(dir) {
   const f = boxes[ed.sel];
   if (!f) return;
   edPushUndo();
-  if (dir === "up") f.y = clamp(f.y - ED_NUDGE, 0, 1 - f.h);
-  else if (dir === "down") f.y = clamp(f.y + ED_NUDGE, 0, 1 - f.h);
-  else if (dir === "left") f.x = clamp(f.x - ED_NUDGE, 0, 1 - f.w);
-  else if (dir === "right") f.x = clamp(f.x + ED_NUDGE, 0, 1 - f.w);
+  const ox = Number(f.ox) || 0, oy = Number(f.oy) || 0;
+  if (dir === "up") f.oy = clamp(oy - ED_NUDGE, -0.5, 0.5);
+  else if (dir === "down") f.oy = clamp(oy + ED_NUDGE, -0.5, 0.5);
+  else if (dir === "left") f.ox = clamp(ox - ED_NUDGE, -0.5, 0.5);
+  else if (dir === "right") f.ox = clamp(ox + ED_NUDGE, -0.5, 0.5);
   edPersistFrame();
   drawEditor();
 }
@@ -226,7 +227,7 @@ function drawEditor() {
     }
   });
 
-  const P = $("#ed-prev"), p = P.getContext("2d"), slots = getLayoutSlots(boxes.length, ed.frame.layout);
+  const P = $("#ed-prev"), p = P.getContext("2d"), slots = typeof getFrameSlots === "function" ? getFrameSlots(ed.frame) : getLayoutSlots(boxes.length, ed.frame.layout);
   if (ed.frame.stage?.enabled && typeof drawStageComposition === "function") {
     drawStageComposition(p, v, state.vw, state.vh, boxes, ed.frame, P.width, P.height, {
       ...previewStageOpts(state.outputs[ed.index], ed.frame, Number($("#ed-time").value) || 0),
@@ -315,6 +316,7 @@ $("#ed-dpad")?.addEventListener("click", e => {
 $("#ed-layout").addEventListener("click", e => {
   const b = e.target.closest("button[data-layout]"); if (!b) return;
   edPushUndo();
+  getFrameBoxes(ed.frame).forEach(box => { box.ox = 0; box.oy = 0; });
   ed.frame.layout = b.dataset.layout; edPersistFrame(); edSyncUI(); drawEditor();
 });
 $("#ed-stage-mode").addEventListener("click", e => {
@@ -429,6 +431,7 @@ $("#vmaker-files")?.addEventListener("change", e => {
       title,
       start: 0,
       end: 0,
+      cutSeconds: 0,
       caption: "",
       note: "",
       tags: [],

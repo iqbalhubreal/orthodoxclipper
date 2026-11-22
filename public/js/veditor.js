@@ -162,7 +162,7 @@ function drawVEditor() {
   ved.baseCv = ensureCanvas(ved.baseCv, W, H);
   const bctx = ved.baseCv.getContext("2d");
   if (ved.frame && v.videoWidth && v.videoHeight) {
-    const boxes = getFrameBoxes(ved.frame), slots = getLayoutSlots(boxes.length, ved.frame.layout);
+    const boxes = getFrameBoxes(ved.frame), slots = typeof getFrameSlots === "function" ? getFrameSlots(ved.frame) : getLayoutSlots(boxes.length, ved.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
     if (ved.frame.stage?.enabled && typeof drawStageComposition === "function") {
       drawStageComposition(bctx, v, sw, sh, boxes, ved.frame, W, H, {
@@ -171,7 +171,7 @@ function drawVEditor() {
       });
     } else {
       const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
-      if (ved.frame.fit) { bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H); }
+      bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H);
       boxes.forEach((box, idx) => {
         const sl = slots[idx], dx = Math.round(sl.x * W), dy = Math.round(sl.y * H), dw = Math.round(sl.w * W), dh = Math.round(sl.h * H);
         const m = mapBox(px(box), dw, dh, ved.frame.fit);
