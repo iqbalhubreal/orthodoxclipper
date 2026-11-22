@@ -71,7 +71,7 @@ function getStageLayoutBoxes(count, layoutId, W, H, stage) {
   const s = W / 1080;
   const fScale = Math.min(1.15, Math.max(0.7, Number(stage?.frameScale) || 1));
   const padX = Math.round(64 * s);
-  const gap = Math.round(92 * s);
+  const gap = Math.round(160 * s);
   const smallGap = Math.round(38 * s);
   const topY = Math.round(334 * s);
   const bottomLimit = Math.round(1425 * s);
@@ -130,12 +130,22 @@ function getStageLayoutBoxes(count, layoutId, W, H, stage) {
   }
 
   const slots = getLayoutSlots(count, layoutId);
-  const rects = slots.map(sl => ({
-    x: Math.round(padX + sl.x * availW + (sl.x > 0 ? smallGap / 2 : 0)),
-    y: Math.round(topY + sl.y * (availH - Math.round(64 * s)) + (sl.y > 0 ? smallGap / 2 : 0)),
-    w: Math.round(sl.w * availW - (sl.w < 1 ? smallGap / 2 : 0)),
-    h: Math.round(sl.h * (availH - Math.round(64 * s)) - (sl.h < 1 ? smallGap / 2 : 0)),
-  }));
+  const hasTwoRows = slots.some(sl => Math.abs(sl.y - 0.5) < 0.01) && slots.every(sl => sl.y === 0 || Math.abs(sl.y - 0.5) < 0.01);
+  const twoRowH = Math.round((availH - gap) / 2);
+  const rects = slots.map(sl => {
+    const x = Math.round(padX + sl.x * availW + (sl.x > 0 ? smallGap / 2 : 0));
+    const w = Math.round(sl.w * availW - (sl.w < 1 ? smallGap / 2 : 0));
+    if (hasTwoRows) {
+      const y = sl.y > 0.25 ? topY + twoRowH + gap : topY;
+      return { x, y, w, h: twoRowH };
+    }
+    return {
+      x,
+      y: Math.round(topY + sl.y * (availH - Math.round(64 * s)) + (sl.y > 0 ? smallGap / 2 : 0)),
+      w,
+      h: Math.round(sl.h * (availH - Math.round(64 * s)) - (sl.h < 1 ? smallGap / 2 : 0)),
+    };
+  });
   const scaled = scaleStageRects(rects, W, topY, bottomLimit, fScale);
   return {
     rects: scaled,
