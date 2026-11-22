@@ -127,15 +127,9 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
   const slots = getLayoutSlots(frameBoxes.length, frame.layout);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
   const stageEnabled = !!(frame.stage?.enabled && typeof drawStageComposition === "function");
-  const audioEnv = preEnv || (stageEnabled && (frame.stage.waveform || frame.stage.activeGlow)
+  const audioEnv = preEnv || (stageEnabled && frame.stage.activeGlow
     ? await extractAudioEnvelope(item.blob, FPS)
     : null);
-  // Optional: find who is really speaking (face tracking + audio), so the stage glow follows them.
-  let speakerTrack = null;
-  if (stageEnabled && typeof getSpeakerTrack === "function") {
-    speakerTrack = await getSpeakerTrack(item, frame, audioEnv, FPS);
-    if (state.cancelled) return null;
-  }
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
   let ctx = null, baseCv = null, baseCtx = null, boxes = null, sw = 0, sh = 0, frameCount = 0;
@@ -182,8 +176,6 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
             drawStageComposition(targetCtx, sample, sw, sh, frameBoxes, frame, W, TOTAL_H, {
               energy,
               timestamp: ts,
-              speakerLevels: speakerTrack ? speakerLevelsAt(speakerTrack, ts) : null,
-              showGuide: false,
             });
           } else {
             if (frame.fit) { targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H); }

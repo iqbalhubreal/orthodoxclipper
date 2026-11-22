@@ -122,20 +122,18 @@
         <div class="span-full"><p class="ed-cap">Box shape in video</p><div class="ed-seg" id="ed-fit" role="group" aria-label="Fill or fit"><button type="button" data-fit="fill" class="on">Fill</button><button type="button" data-fit="fit">Fit</button></div></div>
         <div id="ed-divider-wrap" class="span-full" hidden>
           <p class="ed-cap">Split-screen divider</p>
-          <label class="stage-chk" title="Draws a red line where the split-screen boxes meet. Included in the exported video."><input id="ed-divider" type="checkbox"><span>Red divider line</span></label>
-          <label id="ed-divider-size-row" class="stage-field" hidden><span>Thickness: <b id="ed-divider-size-val">6</b> px</span><input id="ed-divider-size" type="range" min="2" max="16" step="1" value="6"></label>
+          <div class="ed-divider-row">
+            <label class="stage-chk" title="Draws a red line where the split-screen boxes meet. Included in the exported video."><input id="ed-divider" type="checkbox"><span>Red divider line</span></label>
+            <div id="ed-divider-size-row" class="ed-divider-step" hidden><button id="ed-divider-dec" class="btn ed-mini" type="button" aria-label="Decrease thickness">−</button><span id="ed-divider-size-val">6px</span><button id="ed-divider-inc" class="btn ed-mini" type="button" aria-label="Increase thickness">+</button></div>
+          </div>
         </div>
         <div id="ed-stage-opts" class="stage-card span-full" hidden>
           <p class="ed-cap">Background preset</p>
           <div id="ed-stage-bg" class="stage-bg-grid"></div>
           <label class="stage-field"><span>Active speaker glow</span><select id="ed-stage-focus"><option value="auto">Auto (follow speaker)</option><option value="top">Top speaker</option><option value="bottom">Bottom speaker</option><option value="both">Both lit</option></select></label>
-          <label class="ed-time" style="margin-top:2px"><span>Frame size (<span id="ed-stage-scale-val">100</span>%)</span><input id="ed-stage-scale" type="range" min="70" max="115" value="100"></label>
+          <label class="ed-time" style="margin-top:2px"><span>Frame height (<span id="ed-stage-scale-val">100</span>%)</span><input id="ed-stage-scale" type="range" min="70" max="115" value="100"></label>
           <div class="stage-toggles">
-            <label class="stage-chk"><input id="ed-stage-wave" type="checkbox" checked><span>Waveform</span></label>
             <label class="stage-chk"><input id="ed-stage-glow" type="checkbox" checked><span>Glow</span></label>
-            <label class="stage-chk" title="Tracks faces and mouths to light up whoever is talking. Adds a little time when making the vertical video."><input id="ed-stage-detect" type="checkbox" checked><span>Detect speaker</span></label>
-            <label class="stage-chk" title="Dashed guide for the empty top area. Preview only, never in the exported video."><input id="ed-stage-hookzone" type="checkbox" checked><span>IG Hook Zone</span></label>
-            <label class="stage-chk"><input id="ed-stage-subzone" type="checkbox" checked><span>IG Subtitles Zone</span></label>
             <label class="stage-chk"><input id="ed-stage-nameplates" type="checkbox"><span>Nameplates</span></label>
           </div>
           <div id="ed-names-wrap" class="stage-row-2" hidden></div>
@@ -173,7 +171,6 @@
         <div class="ed-seg" id="ved-scope" role="group" aria-label="Editing scope"><button type="button" data-scope="all" class="on">Applies to all</button><button type="button" data-scope="individual">Individual</button></div>
       </div>
       <div class="ed-tool-row span-full"><button id="ved-add-blur" class="btn" type="button">+ Blur</button><button id="ved-add-text" class="btn" type="button" hidden>+ Text</button><button id="ved-import" class="btn" type="button">+ Image</button><input id="ved-file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden></div>
-      <label class="stage-chk span-full" style="padding:2px 4px"><input id="ved-ig-guide" type="checkbox" checked><span>Show IG Edits AI Subtitles Safe Zone</span></label>
       <div class="ved-card span-full ved-audio-card">
         <div class="ved-speed-head"><span class="ed-cap" style="margin:0">Speed (<span id="ved-speed-val">1.0</span>×)</span><button id="ved-speed-reset" class="btn ed-mini" type="button">1.0×</button></div>
         <label class="ed-time" style="margin-top:4px"><input id="ved-speed" type="range" min="0.5" max="2" step="0.1" value="1" aria-label="Clip speed"></label>
@@ -224,7 +221,6 @@
 <script defer src="/js/cutting.js"></script>
 <script defer src="/js/upload.js"></script>
 <script defer src="/js/stage.js"></script>
-<script defer src="/js/speaker.js"></script>
 <script defer src="/js/vertical.js"></script>
 <script defer src="/js/presets.js"></script>
 <script defer src="/js/editor.js"></script>

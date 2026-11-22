@@ -16,14 +16,10 @@ function defaultStageConfig(item = null) {
     style: "classic",
     bg: "midnight",
     frameScale: 1,
-    waveform: true,
     activeGlow: true,
-    subtitleSafeZone: true,
-    hookGuide: true,
     nameplates: false,
     names: ["", "", "", ""],
     speakerFocus: "auto",
-    detectSpeaker: !(typeof IS_MOBILE !== "undefined" && IS_MOBILE),
   };
 }
 
@@ -40,14 +36,10 @@ function normalizeStageConfig(raw, item = null) {
     style,
     bg: STAGE_BG_PRESETS.some(p => p.id === bgRaw) ? bgRaw : base.bg,
     frameScale: Math.min(1.15, Math.max(0.7, Number(raw.frameScale) || 1)),
-    waveform: raw.waveform !== false,
     activeGlow: raw.activeGlow !== false,
-    subtitleSafeZone: raw.subtitleSafeZone !== false,
-    hookGuide: raw.hookGuide !== false,
     nameplates: !!raw.nameplates,
     names: Array.from({ length: 4 }, (_, i) => String(Array.isArray(raw.names) ? (raw.names[i] ?? "") : "").slice(0, 28)),
     speakerFocus: ["auto", "top", "bottom", "both"].includes(raw.speakerFocus) ? raw.speakerFocus : "auto",
-    detectSpeaker: raw.detectSpeaker === undefined ? base.detectSpeaker : !!raw.detectSpeaker,
   };
 }
 
@@ -68,12 +60,10 @@ function stageRoundRectPath(ctx, x, y, w, h, r) {
 
 function scaleStageRects(rects, W, topY, bottomLimit, scale) {
   if (!scale || Math.abs(scale - 1) < 0.005) return rects;
-  const cx = W / 2, cy = (topY + bottomLimit) / 2;
   return rects.map(r => {
-    const nw = Math.round(r.w * scale), nh = Math.round(r.h * scale);
-    const nx = Math.round(cx + (r.x - cx) * scale);
-    const ny = Math.round(cy + (r.y - cy) * scale);
-    return { x: nx, y: ny, w: nw, h: nh };
+    const nh = Math.round(r.h * scale);
+    const ny = Math.round(r.y + (r.h - nh) / 2);
+    return { x: r.x, y: ny, w: r.w, h: nh };
   });
 }
 
@@ -81,16 +71,16 @@ function getStageLayoutBoxes(count, layoutId, W, H, stage) {
   const s = W / 1080;
   const fScale = Math.min(1.15, Math.max(0.7, Number(stage?.frameScale) || 1));
   const padX = Math.round(64 * s);
-  const gap = Math.round(72 * s);
-  const smallGap = Math.round(22 * s);
+  const gap = Math.round(92 * s);
+  const smallGap = Math.round(38 * s);
   const topY = Math.round(334 * s);
-  const bottomLimit = stage?.subtitleSafeZone ? Math.round(1425 * s) : Math.round(1790 * s);
+  const bottomLimit = Math.round(1425 * s);
   const availW = W - padX * 2;
   const availH = Math.max(Math.round(420 * s), bottomLimit - topY);
 
   if (stage?.style === "pip" && count >= 2) {
     const mainRect = scaleStageRects([{ x: padX, y: topY, w: availW, h: availH }], W, topY, bottomLimit, fScale)[0];
-    const pipW = Math.round(300 * s * fScale);
+    const pipW = Math.round(300 * s);
     const pipH = Math.round(370 * s * fScale);
     const margin = Math.round(24 * s);
     const rects = [mainRect];
@@ -191,69 +181,6 @@ function drawStageBackground(ctx, W, H, preset, timestamp, sourceFrame = null) {
   ctx.restore();
 }
 
-function drawStageDivider(ctx, W, dividerY, preset, energy) {
-  const s = W / 1080;
-  const marginX = Math.round(72 * s);
-  const bars = 44;
-  const totalW = W - marginX * 2;
-  const step = totalW / bars;
-  const bw = Math.max(2, step * 0.52);
-  ctx.save();
-  ctx.fillStyle = preset.accent;
-  for (let i = 0; i < bars; i++) {
-    const norm = i / (bars - 1);
-    const envelope = Math.sin(norm * Math.PI);
-    const wave = 0.25 + 0.75 * Math.abs(Math.sin((i + energy * 14) * 0.78));
-    const h = Math.max(Math.round(5 * s), Math.round((8 + energy * 42 * envelope * wave) * s));
-    const x = marginX + i * step;
-    ctx.globalAlpha = 0.35 + 0.6 * energy * envelope;
-    stageRoundRectPath(ctx, x, dividerY - h / 2, bw, h, bw / 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawStageSubtitleGuide(ctx, W, H, isPreview = true) {
-  if (!isPreview) return;
-  const s = W / 1080;
-  const x = Math.round(72 * s);
-  const y = Math.round(1450 * s);
-  const w = W - x * 2;
-  const h = Math.round(190 * s);
-  ctx.save();
-  ctx.setLineDash([Math.round(8 * s), Math.round(6 * s)]);
-  ctx.strokeStyle = "rgba(56, 189, 248, 0.55)";
-  ctx.lineWidth = Math.max(1, 1.5 * s);
-  stageRoundRectPath(ctx, x, y, w, h, Math.round(20 * s));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.font = `600 ${Math.max(7, Math.round(20 * s))}px "Inter", system-ui, sans-serif`;
-  ctx.fillStyle = "rgba(125, 211, 252, 0.78)";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("IG EDITS AI SUBTITLES ZONE", W / 2, y + h / 2);
-  ctx.restore();
-}
-
-function drawStageHookGuide(ctx, W, H) {
-  const s = W / 1080;
-  const x = Math.round(72 * s), y = Math.round(24 * s);
-  const w = W - x * 2, h = Math.round(334 * s) - y - Math.round(16 * s);
-  ctx.save();
-  ctx.setLineDash([Math.round(8 * s), Math.round(6 * s)]);
-  ctx.strokeStyle = "rgba(251, 191, 36, 0.55)";
-  ctx.lineWidth = Math.max(1, 1.5 * s);
-  stageRoundRectPath(ctx, x, y, w, h, Math.round(20 * s));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.font = `600 ${Math.max(7, Math.round(20 * s))}px "Inter", system-ui, sans-serif`;
-  ctx.fillStyle = "rgba(252, 211, 77, 0.78)";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("IG HOOK ZONE", W / 2, y + h / 2);
-  ctx.restore();
-}
-
 function drawStageNameplate(ctx, rect, text, accent, isActive, s) {
   const label = String(text || "").trim();
   if (!label) return;
@@ -319,9 +246,7 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
   const count = frameBoxes.length;
   let levels = new Array(count).fill(0);
   if (stage.activeGlow) {
-    levels = opts.speakerLevels && opts.speakerLevels.length === count
-      ? opts.speakerLevels
-      : stageFallbackLevels(stage, count, timestamp, energy);
+    levels = stageFallbackLevels(stage, count, timestamp, energy);
   }
   const anySpeaking = Math.max(0, ...levels) > 0.35 && stage.speakerFocus !== "both";
   const pulse = 0.65 + 0.35 * energy;
@@ -414,13 +339,7 @@ function drawStageComposition(ctx, source, sw, sh, frameBoxes, frame, W, H, opts
     }
   });
 
-  if (stage.waveform && style !== "pip") {
-    drawStageDivider(ctx, W, layoutInfo.dividerY, preset, energy);
-  }
-  if (opts.showGuide) {
-    if (stage.hookGuide) drawStageHookGuide(ctx, W, H);
-    if (stage.subtitleSafeZone) drawStageSubtitleGuide(ctx, W, H, true);
-  }
+
 }
 
 async function extractAudioEnvelope(blob, fps = 30) {

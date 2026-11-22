@@ -54,7 +54,9 @@ function edSyncUI() {
   $("#ed-divider-wrap").hidden = boxes.length < 2 || !!stTmp.enabled;
   $("#ed-divider").checked = !!ed.frame.divider;
   const dSize = dividerThickness(ed.frame);
-  $("#ed-divider-size").value = dSize; $("#ed-divider-size-val").textContent = dSize;
+  $("#ed-divider-size-val").textContent = `${dSize}px`;
+  $("#ed-divider-dec").disabled = dSize <= 2;
+  $("#ed-divider-inc").disabled = dSize >= 16;
   $("#ed-divider-size-row").hidden = !ed.frame.divider;
   const st = ed.frame.stage || (ed.frame.stage = defaultStageConfig(state.outputs[ed.index]));
   const curStyle = st.enabled ? (st.style && st.style !== "classic" ? st.style : "2.5d") : "classic";
@@ -65,12 +67,7 @@ function edSyncUI() {
   const fPct = Math.round((Number(st.frameScale) || 1) * 100);
   $("#ed-stage-scale").value = fPct;
   $("#ed-stage-scale-val").textContent = fPct;
-  $("#ed-stage-wave").checked = st.waveform !== false;
   $("#ed-stage-glow").checked = st.activeGlow !== false;
-  $("#ed-stage-detect").checked = !!st.detectSpeaker;
-  $("#ed-stage-detect").disabled = st.activeGlow === false || (st.speakerFocus || "auto") !== "auto";
-  $("#ed-stage-subzone").checked = st.subtitleSafeZone !== false;
-  $("#ed-stage-hookzone").checked = st.hookGuide !== false;
   $("#ed-stage-nameplates").checked = !!st.nameplates;
   const namesWrap = $("#ed-names-wrap");
   namesWrap.hidden = !st.nameplates;
@@ -282,13 +279,10 @@ $("#ed-stage-bg").addEventListener("click", e => {
 });
 $("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; edPersistFrame(); edSyncUI(); drawEditor(); });
 $("#ed-stage-scale").addEventListener("input", e => { const pct = Number(e.target.value); ed.frame.stage.frameScale = pct / 100; $("#ed-stage-scale-val").textContent = pct; edPersistFrame(); drawEditor(); });
-$("#ed-stage-wave").addEventListener("change", e => { ed.frame.stage.waveform = e.target.checked; edPersistFrame(); drawEditor(); });
 $("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; edPersistFrame(); edSyncUI(); drawEditor(); });
-$("#ed-stage-detect").addEventListener("change", e => { ed.frame.stage.detectSpeaker = e.target.checked; edPersistFrame(); });
 $("#ed-divider").addEventListener("change", e => { ed.frame.divider = e.target.checked; edPersistFrame(); edSyncUI(); drawEditor(); });
-$("#ed-divider-size").addEventListener("input", e => { ed.frame.dividerSize = Number(e.target.value); $("#ed-divider-size-val").textContent = e.target.value; edPersistFrame(); drawEditor(); });
-$("#ed-stage-hookzone").addEventListener("change", e => { ed.frame.stage.hookGuide = e.target.checked; edPersistFrame(); drawEditor(); });
-$("#ed-stage-subzone").addEventListener("change", e => { ed.frame.stage.subtitleSafeZone = e.target.checked; edPersistFrame(); drawEditor(); });
+$("#ed-divider-dec").addEventListener("click", () => { ed.frame.dividerSize = Math.max(2, dividerThickness(ed.frame) - 2); edPersistFrame(); edSyncUI(); drawEditor(); });
+$("#ed-divider-inc").addEventListener("click", () => { ed.frame.dividerSize = Math.min(16, dividerThickness(ed.frame) + 2); edPersistFrame(); edSyncUI(); drawEditor(); });
 $("#ed-stage-nameplates").addEventListener("change", e => { ed.frame.stage.nameplates = e.target.checked; edPersistFrame(); edSyncUI(); drawEditor(); });
 $("#ed-names-wrap").addEventListener("input", e => {
   const inp = e.target.closest("input[data-name-idx]");

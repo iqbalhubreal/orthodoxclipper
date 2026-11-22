@@ -1,6 +1,6 @@
 "use strict";
 /* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text only in Individual mode). */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, guides: null, showIgGuide: true, scope: "all", speed: 1, voiceBoost: false };
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", speed: 1, voiceBoost: false };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -165,11 +165,6 @@ function drawVEditor() {
   ctx.drawImage(ved.baseCv, 0, 0, W, H);
   drawVerticalLayers(ctx, ved.baseCv, W, H, ved.layers);
 
-  if (ved.showIgGuide && typeof drawStageSubtitleGuide === "function") {
-    if (typeof drawStageHookGuide === "function" && ved.frame?.stage?.hookGuide !== false) drawStageHookGuide(ctx, W, H);
-    drawStageSubtitleGuide(ctx, W, H, true);
-  }
-
   if (ved.guides) {
     ctx.save();
     ctx.strokeStyle = "#38bdf8";
@@ -218,7 +213,6 @@ function vedSyncControls() {
   if ($("#ved-speed-val")) $("#ved-speed-val").textContent = sp.toFixed(1);
   if ($("#ved-speed-reset")) $("#ved-speed-reset").disabled = Math.abs(sp - 1) < 0.01;
   if ($("#ved-voice-boost")) $("#ved-voice-boost").checked = !!ved.voiceBoost;
-  if ($("#ved-ig-guide")) $("#ved-ig-guide").checked = !!ved.showIgGuide;
 
   if (!isIndiv && ved.layers[ved.sel]?.kind === "text") ved.sel = -1;
   const l = ved.layers[ved.sel];
@@ -365,10 +359,8 @@ async function openVerticalEditor(i, opts = {}) {
   const item = state.outputs[i];
   if (!item || state.busy) return;
   try {
-    const _vedPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs().ved : { scope: "all", showIgGuide: true };
+    const _vedPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs().ved : { scope: "all" };
     ved.scope = _vedPrefs.scope === "individual" ? "individual" : "all";
-    ved.showIgGuide = _vedPrefs.showIgGuide !== false;
-    if ($("#ved-ig-guide")) $("#ved-ig-guide").checked = ved.showIgGuide;
     ved.frame = clone(opts.frame || item.vFrame || state.lastFrame || defaultFrame());
     ved.returnToEditor = !!opts.returnToEditor;
     const cv = $("#ved-canvas");
@@ -493,11 +485,6 @@ $("#ved-scope")?.addEventListener("click", e => {
   if (typeof saveClipperPrefs === "function") saveClipperPrefs({ ved: { scope: ved.scope } });
   vedSaveAudioSpeedToState();
   vedSyncControls();
-  drawVEditor();
-});
-$("#ved-ig-guide")?.addEventListener("change", e => {
-  ved.showIgGuide = e.target.checked;
-  if (typeof saveClipperPrefs === "function") saveClipperPrefs({ ved: { showIgGuide: ved.showIgGuide } });
   drawVEditor();
 });
 $("#ved-speed")?.addEventListener("input", e => {

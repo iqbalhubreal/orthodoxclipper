@@ -1,7 +1,6 @@
 "use strict";
 /* Play / pause preview for the Vertical Maker and the Vertical Editor.
-   Plays the clip with the real audio level driving the waveform and glow. If speaker detection is on, the first Play
-   analyses the clip once (the result is cached on the clip and reused when you export). */
+   Plays the clip with the real audio level driving the glow. */
 const pv = { playing: false, raf: 0, token: 0, cfg: null, sound: true, audioCtx: null };
 
 function ensurePreviewAudioGraph(v) {
@@ -54,13 +53,11 @@ function previewApplyLive() {
   });
 }
 
-/* Energy (audio level) and speaker levels to draw at time t. Used by editor.js and veditor.js. */
+/* Energy (audio level) to draw at time t. Used by editor.js and veditor.js. */
 function previewStageOpts(item, frame, t) {
   const env = item && item._env;
   const energy = env && env.length ? env[Math.min(env.length - 1, Math.max(0, Math.round(t * 30)))] : 0.55;
-  const track = item && item._spk && typeof speakerWanted === "function" && speakerWanted(frame) && item._spk.key === speakerKey(frame)
-    ? item._spk.track : null;
-  return { energy, timestamp: t, speakerLevels: track ? speakerLevelsAt(track, t) : null };
+  return { energy, timestamp: t };
 }
 
 function previewSyncButtons() {
@@ -95,12 +92,9 @@ async function previewToggle(cfg) {
   if (!item) return;
   cfg.button.disabled = true;
   try {
-    if (st?.enabled && !item._env && (st.waveform || st.activeGlow) && typeof extractAudioEnvelope === "function") {
+    if (st?.enabled && !item._env && st.activeGlow && typeof extractAudioEnvelope === "function") {
       cfg.button.textContent = "Reading audio...";
       item._env = await extractAudioEnvelope(item.blob, 30);
-    }
-    if (typeof speakerWanted === "function" && speakerWanted(frame)) {
-      await getSpeakerTrack(item, frame, item._env, 30, p => { cfg.button.textContent = p === null ? "Loading detector..." : `Detecting ${p}%`; });
     }
   } finally { cfg.button.disabled = false; previewSyncButtons(); }
   if (token !== pv.token) return;

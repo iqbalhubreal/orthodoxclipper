@@ -33,7 +33,6 @@ function defaultClipperPrefs() {
     frame: null,
     ved: {
       scope: "all",
-      showIgGuide: true,
       speed: 1,
       voiceBoost: false,
     },
@@ -50,7 +49,6 @@ function loadClipperPrefs() {
     if (raw.frame && typeof raw.frame === "object") base.frame = raw.frame;
     if (raw.ved && typeof raw.ved === "object") {
       base.ved.scope = raw.ved.scope === "individual" ? "individual" : "all";
-      base.ved.showIgGuide = raw.ved.showIgGuide !== false;
       base.ved.speed = clampSpeed(raw.ved.speed);
       base.ved.voiceBoost = !!raw.ved.voiceBoost;
     }
