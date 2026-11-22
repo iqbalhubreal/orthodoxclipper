@@ -31,10 +31,6 @@ function defaultAnimPrefs() {
     color: 0xc5d5e4,
     ti: false,
     surface: "wood",
-    showCase: false,
-    startAt: 1.5,
-    rest: 4,
-    pose: "flat",
     sticker: true,
     stickerPreset: "follow",
     stickerText: "Follow for more clips",
@@ -70,10 +66,6 @@ function loadClipperPrefs() {
       if (Number.isFinite(Number(raw.anim.color))) base.anim.color = Number(raw.anim.color);
       base.anim.ti = !!raw.anim.ti;
       if (["wood", "marble", "concrete"].includes(raw.anim.surface)) base.anim.surface = raw.anim.surface;
-      base.anim.showCase = !!raw.anim.showCase;
-      if (Number.isFinite(Number(raw.anim.startAt))) base.anim.startAt = Math.min(6, Math.max(0, Number(raw.anim.startAt)));
-      if (Number.isFinite(Number(raw.anim.rest))) base.anim.rest = Math.min(8, Math.max(1, Number(raw.anim.rest)));
-      base.anim.pose = raw.anim.pose === "float" ? "float" : "flat";
       base.anim.sticker = raw.anim.sticker !== false;
       if (["follow", "subscribe", "custom"].includes(raw.anim.stickerPreset)) base.anim.stickerPreset = raw.anim.stickerPreset;
       if (typeof raw.anim.stickerText === "string") base.anim.stickerText = raw.anim.stickerText.slice(0, 48);

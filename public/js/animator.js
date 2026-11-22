@@ -2,7 +2,7 @@
 /* 3D Phone Mockup Animator (Three.js r128): wraps the composed 1080x1920 vertical video inside a 3D phone zoom-out/table/zoom-in animation.
    Uses a single shared WebGLRenderer with preserveDrawingBuffer: true so Android WebView neither hits context limits nor drops frames on drawImage(). */
 const ANIM_SW = 720, ANIM_SH = 1536, ANIM_VY = 128, ANIM_VH = 1280;
-const ANIM_ZO = 1.4, ANIM_ZI = 1.2, ANIM_TAIL = 1.5;
+const ANIM_ZO = 1.4, ANIM_REST = 2.0, ANIM_ZI = 1.2;
 const ANIM_CAM = { full: [90, 18.47, 0], rest: [90, 31, 0] };
 const ANIM_END = [90, 29.8, 0];
 
@@ -25,7 +25,7 @@ const anim = {
   frame: null,
   returnToEditor: false,
   scope: "all",
-  cfg: typeof defaultAnimPrefs === "function" ? defaultAnimPrefs() : { enabled: false, scope: "all", color: 0xc5d5e4, ti: false, surface: "wood", showCase: false, startAt: 1.5, rest: 4, pose: "flat", sticker: true, stickerPreset: "follow", stickerText: "Follow for more clips" },
+  cfg: typeof defaultAnimPrefs === "function" ? defaultAnimPrefs() : { enabled: false, scope: "all", color: 0xc5d5e4, ti: false, surface: "wood", sticker: true, stickerPreset: "follow", stickerText: "Follow for more clips" },
   playing: true,
   sound: false,
   t: 0,
@@ -41,10 +41,17 @@ function animClamp(v, a = 0, b = 1) { return Math.min(b, Math.max(a, v)); }
 function animLerp(a, b, k) { return a + (b - a) * k; }
 function animEase(k) { k = animClamp(k); return k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; }
 function animEaseBack(k) { k = animClamp(k); const c = 1.70158; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); }
-function animTimeline(cfg) {
-  const a = Number(cfg?.startAt ?? 1.5), r = Number(cfg?.rest ?? 4);
-  const b = a + ANIM_ZO, c = b + r, d = c + ANIM_ZI;
-  return { a, b, c, d, total: d + ANIM_TAIL };
+function animTimeline(duration) {
+  const total = Math.max(4, Number(duration) || 10);
+  const a = total * 0.4;
+  const avail = Math.max(1.5, total - a);
+  const rest = Math.min(ANIM_REST, Math.max(0.6, avail - 0.8));
+  const rem = Math.max(0.6, avail - rest);
+  const ratio = ANIM_ZO + ANIM_ZI;
+  const zo = rem >= ratio ? ANIM_ZO : rem * (ANIM_ZO / ratio);
+  const zi = rem >= ratio ? ANIM_ZI : rem * (ANIM_ZI / ratio);
+  const b = a + zo, c = b + rest, d = c + zi;
+  return { a, b, c, d, zo, rest, zi, total };
 }
 function animRR(ctx, x, y, w, h, r) {
   const rad = Math.min(r, w / 2, h / 2);
@@ -225,9 +232,6 @@ function getAnimEngine() {
   phone.position.set(0, FZ, 0); phone.rotation.set(-Math.PI / 2, 0, 0);
   scene.add(phone);
 
-  const cs = rrShape(7.5, 15.2, 1.3); cs.holes.push(rrShape(6.72, 14.3, 0.95));
-  const caseMesh = new THREE.Mesh(new THREE.ExtrudeGeometry(cs, { depth: 0.76, bevelThickness: 0.08, bevelSize: 0.08, bevelSegments: 3, curveSegments: 16 }), new THREE.MeshStandardMaterial({ color: 0x1d2029, roughness: 0.75, metalness: 0.05 }));
-  caseMesh.position.z = -0.38; caseMesh.castShadow = true; caseMesh.visible = false; phone.add(caseMesh);
 
   const gcv = document.createElement("canvas"); gcv.width = gcv.height = 256;
   { const g = gcv.getContext("2d"), r = g.createRadialGradient(128, 128, 10, 128, 128, 128); r.addColorStop(0, "rgba(255,255,255,.9)"); r.addColorStop(0.4, "rgba(255,255,255,.3)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 256, 256); }
@@ -240,7 +244,7 @@ function getAnimEngine() {
 
   anim.engine = {
     glCv, src, sx, hud, hx, renderer, scene, camera, table, phone,
-    frameMat, backMat, tex, glare, gt, caseMesh, glow, sl, pxc, pxg, FZ, surfTex,
+    frameMat, backMat, tex, glare, gt, glow, sl, pxc, pxg, FZ, surfTex,
   };
   return anim.engine;
 }
@@ -337,17 +341,16 @@ function applyAnimSceneConfig(eng, cfg) {
   eng.table.material.map = eng.surfTex(surf);
   eng.table.material.roughness = { wood: 0.5, marble: 0.22, concrete: 0.85 }[surf];
   eng.table.material.needsUpdate = true;
-  eng.caseMesh.visible = !!cfg.showCase;
 }
 
-function animatorRenderAt(nowTime, targetCtx, sourceCanvas, cfg, W = 1080, H = 1920) {
+function animatorRenderAt(nowTime, targetCtx, sourceCanvas, cfg, W = 1080, H = 1920, duration = 10) {
   const eng = getAnimEngine();
   if (!eng || !targetCtx || !sourceCanvas) {
     if (targetCtx && sourceCanvas) targetCtx.drawImage(sourceCanvas, 0, 0, W, H);
     return;
   }
   const c = cfg || anim.cfg;
-  const L = animTimeline(c);
+  const L = animTimeline(duration);
   const t = Number(nowTime) || 0;
   let o = 1;
   if (t >= L.a && t < L.d) {
@@ -363,9 +366,9 @@ function animatorRenderAt(nowTime, targetCtx, sourceCanvas, cfg, W = 1080, H = 1
 
     const R = (a, b, k) => a.map((v, i) => animLerp(v, b[i], k));
     let p;
-    if (t < L.b) p = R(ANIM_CAM.full, ANIM_CAM.rest, animEase((t - L.a) / ANIM_ZO));
-    else if (t < L.c) p = R(ANIM_CAM.rest, ANIM_END, animEase((t - L.b) / Math.max(0.1, Number(c.rest) || 4)));
-    else p = R(ANIM_END, ANIM_CAM.full, animEase((t - L.c) / ANIM_ZI));
+    if (t < L.b) p = R(ANIM_CAM.full, ANIM_CAM.rest, animEase((t - L.a) / Math.max(0.1, L.zo)));
+    else if (t < L.c) p = R(ANIM_CAM.rest, ANIM_END, animEase((t - L.b) / Math.max(0.1, L.rest)));
+    else p = R(ANIM_END, ANIM_CAM.full, animEase((t - L.c) / Math.max(0.1, L.zi)));
     const el = p[0] * Math.PI / 180, yw = p[2], d = p[1];
     eng.camera.position.set(Math.sin(yw) * Math.cos(el) * d, eng.FZ + Math.sin(el) * d, Math.cos(yw) * Math.cos(el) * d);
     eng.camera.up.set(-Math.sin(yw), 0, -Math.cos(yw));
@@ -377,10 +380,9 @@ function animatorRenderAt(nowTime, targetCtx, sourceCanvas, cfg, W = 1080, H = 1
     for (let i = 0; i < 64; i += 4) { r += data[i]; g += data[i + 1]; b += data[i + 2]; }
     eng.glow.material.color.setRGB(r / 4080, g / 4080, b / 4080);
 
-    const w = t < L.a ? 0 : t < L.b ? animEase((t - L.a) / ANIM_ZO) : t < L.c ? 1 : t < L.d ? 1 - animEase((t - L.c) / ANIM_ZI) : 0;
-    const fl = c.pose === "float";
-    eng.phone.position.y = eng.FZ + (fl ? w * (0.35 + 0.12 * Math.sin(t * 1.3)) : 0);
-    eng.phone.rotation.y = fl ? w * 0.35 * Math.sin(t * 0.45) : 0;
+    const w = t < L.a ? 0 : t < L.b ? animEase((t - L.a) / Math.max(0.1, L.zo)) : t < L.c ? 1 : t < L.d ? 1 - animEase((t - L.c) / Math.max(0.1, L.zi)) : 0;
+    eng.phone.position.y = eng.FZ;
+    eng.phone.rotation.y = 0;
     const ph = ((t - L.b - 0.5) % 3.2) / 1.4, k = 1.1 - 2.2 * animClamp(ph);
     eng.gt.offset.set(k, k);
     const activeRest = t >= L.b + 0.5 && t < L.c && ph >= 0 && ph <= 1 && o < 0.05;
@@ -444,12 +446,12 @@ function drawAnimPreview() {
     ctx.drawImage(srcCv, 0, 0, W, H);
     return;
   }
-  animatorRenderAt(anim.t, ctx, srcCv, anim.cfg, W, H);
+  animatorRenderAt(anim.t, ctx, srcCv, anim.cfg, W, H, v?.duration || 10);
 }
 
 function animBuildBar() {
-  const L = animTimeline(anim.cfg);
-  const parts = [[L.a, "Video"], [ANIM_ZO, "Zoom out"], [anim.cfg.rest, "On table"], [ANIM_ZI, "Zoom in"], [ANIM_TAIL, "Video"]];
+  const L = animTimeline(anim.video?.duration || 10);
+  const parts = [[L.a, "Video"], [L.zo, "Zoom out"], [L.rest, "On table"], [L.zi, "Zoom in"], [Math.max(0, L.total - L.d), "Video"]];
   const bar = $("#anim-bar");
   if (bar) {
     bar.innerHTML = parts.map(([d, n], i) => `<i class="p${i}" style="width:${d / L.total * 100}%">${d / L.total > 0.12 ? n : ""}</i>`).join("") + '<span class="anim-head" id="anim-head"></span>';
@@ -459,7 +461,7 @@ function animBuildBar() {
 }
 
 function animSyncTimelineUI() {
-  const L = animTimeline(anim.cfg);
+  const L = animTimeline(anim.video?.duration || 10);
   const head = $("#anim-head");
   if (head) head.style.left = (animClamp(anim.t / L.total) * 100) + "%";
   if ($("#anim-scrub")) $("#anim-scrub").value = anim.t;
@@ -478,12 +480,6 @@ function animSyncControls() {
   if ($("#anim-controls-wrap")) $("#anim-controls-wrap").hidden = !c.enabled;
   document.querySelectorAll("#anim-sw button").forEach(b => b.classList.toggle("on", Number(b.dataset.c) === Number(c.color)));
   document.querySelectorAll("#anim-surf button").forEach(b => b.classList.toggle("on", b.dataset.surf === c.surface));
-  if ($("#anim-case")) $("#anim-case").checked = !!c.showCase;
-  if ($("#anim-pose")) $("#anim-pose").checked = c.pose === "float";
-  if ($("#anim-start")) $("#anim-start").value = c.startAt;
-  if ($("#anim-start-val")) $("#anim-start-val").textContent = Number(c.startAt).toFixed(1);
-  if ($("#anim-rest")) $("#anim-rest").value = c.rest;
-  if ($("#anim-rest-val")) $("#anim-rest-val").textContent = Number(c.rest).toFixed(1);
   if ($("#anim-stk-on")) $("#anim-stk-on").checked = !!c.sticker;
   document.querySelectorAll("#anim-stk-presets button").forEach(b => b.classList.toggle("on", b.dataset.stk === c.stickerPreset));
   if ($("#anim-stk-txt") && document.activeElement !== $("#anim-stk-txt")) $("#anim-stk-txt").value = c.stickerText || "";
@@ -535,7 +531,7 @@ function animLoop(now) {
   anim.last = now;
   if (anim.playing) {
     anim.t += dt;
-    const L = animTimeline(anim.cfg);
+    const L = animTimeline(anim.video?.duration || 10);
     if (anim.t >= L.total) { anim.t = 0; animSeekVideo(); }
   }
   drawAnimPreview();
@@ -655,32 +651,6 @@ $("#anim-surf")?.addEventListener("click", e => {
   anim.cfg.surface = b.dataset.surf;
   animSaveToState();
   animSyncControls();
-  drawAnimPreview();
-});
-$("#anim-case")?.addEventListener("change", e => {
-  anim.cfg.showCase = e.target.checked;
-  animSaveToState();
-  drawAnimPreview();
-});
-$("#anim-pose")?.addEventListener("change", e => {
-  anim.cfg.pose = e.target.checked ? "float" : "flat";
-  animSaveToState();
-  drawAnimPreview();
-});
-$("#anim-start")?.addEventListener("input", e => {
-  anim.cfg.startAt = Number(e.target.value);
-  if ($("#anim-start-val")) $("#anim-start-val").textContent = anim.cfg.startAt.toFixed(1);
-  animBuildBar();
-  animSyncTimelineUI();
-  animSaveToState();
-  drawAnimPreview();
-});
-$("#anim-rest")?.addEventListener("input", e => {
-  anim.cfg.rest = Number(e.target.value);
-  if ($("#anim-rest-val")) $("#anim-rest-val").textContent = anim.cfg.rest.toFixed(1);
-  animBuildBar();
-  animSyncTimelineUI();
-  animSaveToState();
   drawAnimPreview();
 });
 $("#anim-stk-on")?.addEventListener("change", e => {

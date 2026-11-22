@@ -131,6 +131,10 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
     ? await extractAudioEnvelope(item.blob, FPS)
     : null);
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
+  let clipDuration = Math.max(1, (Number(item.end) - Number(item.start) || 10) + 2 * PAD);
+  if (animEnabled) {
+    try { const d = await input.computeDuration(); if (Number.isFinite(d) && d > 0) clipDuration = d; } catch {}
+  }
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
   let ctx = null, baseCv = null, baseCtx = null, animSrcCv = null, animSrcCtx = null, boxes = null, sw = 0, sh = 0, frameCount = 0;
   try {
@@ -196,7 +200,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
             drawVerticalLayers(compCtx, baseCv, W, TOTAL_H, layers);
           }
           if (animEnabled) {
-            animatorRenderAt(ts, ctx, animSrcCv, animCfg, W, TOTAL_H);
+            animatorRenderAt(ts, ctx, animSrcCv, animCfg, W, TOTAL_H, clipDuration);
           }
           frameCount++;
           return ctx.canvas;
