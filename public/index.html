@@ -80,6 +80,8 @@
     <p class="hint" id="mode-hint"></p>
   </div>
   <button id="go" type="button">Create clips &amp; captions</button>
+  <button id="open-vmaker" class="btn" type="button" style="width:100%;margin-top:8px">Vertical Maker (import video)</button>
+  <input id="vmaker-files" type="file" accept="video/*" multiple hidden>
   <p id="privacy">Your video stays on your device.</p>
   <div id="app-note" style="margin-top:14px;text-align:center">
     <a class="btn" href="/orthodox-clipper-android.zip" download="Orthodox-Clipper-Android.zip">Download Android app (.zip)</a>
@@ -108,7 +110,15 @@
       </div>
     </div>
     <div class="ed-side">
-      <canvas id="ed-prev" width="180" height="320"></canvas>
+      <div class="ed-prev-row">
+        <div class="ed-prev-sel" id="ed-prev-sel" role="group" aria-label="Select box to move"></div>
+        <canvas id="ed-prev" width="180" height="320"></canvas>
+        <div class="ed-dpad" id="ed-dpad" role="group" aria-label="Move selected box">
+          <span></span><button type="button" class="btn ed-dpad-btn" data-dir="up" aria-label="Move box up">↑</button><span></span>
+          <button type="button" class="btn ed-dpad-btn" data-dir="left" aria-label="Move box left">←</button><button type="button" class="btn ed-dpad-btn ed-undo-btn" id="ed-undo" aria-label="Undo last box change" disabled>Undo</button><button type="button" class="btn ed-dpad-btn" data-dir="right" aria-label="Move box right">→</button>
+          <span></span><button type="button" class="btn ed-dpad-btn" data-dir="down" aria-label="Move box down">↓</button><span></span>
+        </div>
+      </div>
       <div class="ed-tools">
         <div class="span-full">
           <p class="ed-cap">Stage style</p>

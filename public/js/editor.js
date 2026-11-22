@@ -2,7 +2,8 @@
 /* Vertical framing editor (1 to 4 adjustable cropping boxes, flexible layouts, 2.5D Debate Stage, canvas, drag handles, preview, mobile layout). */
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 const BOX_COLORS = ["#8b79ff", "#42c98b", "#f0b35a", "#38bdf8"];
-const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0 };
+const ed = { index: 0, frame: null, drag: null, scale: 1, k: 1, sel: 0, undo: [] };
+const ED_NUDGE = 0.02;
 
 function boxLabel(idx, count) {
   if (count === 1) return "Full";
@@ -24,6 +25,39 @@ function edPersistFrame() {
   state.lastFrame = clone(ed.frame);
   saveClipperPrefs({ frame: { fit: !!ed.frame.fit, divider: !!ed.frame.divider, dividerSize: dividerThickness(ed.frame), layout: ed.frame.layout || "stack", stage: clone(ed.frame.stage) } });
 }
+function edSyncUndo() {
+  const btn = $("#ed-undo");
+  if (btn) btn.disabled = !ed.undo.length;
+}
+function edPushUndo() {
+  if (!ed.frame) return;
+  ed.undo.push({ boxes: clone(getFrameBoxes(ed.frame)), sel: ed.sel, layout: ed.frame.layout });
+  if (ed.undo.length > 30) ed.undo.shift();
+  edSyncUndo();
+}
+function edDoUndo() {
+  const snap = ed.undo.pop();
+  if (!snap || !ed.frame) return;
+  ed.frame.boxes = snap.boxes;
+  ed.sel = clamp(snap.sel, 0, Math.max(0, snap.boxes.length - 1));
+  if (snap.layout) ed.frame.layout = snap.layout;
+  edPersistFrame();
+  edSyncUI();
+  edSyncUndo();
+  drawEditor();
+}
+function edNudgeBox(dir) {
+  const boxes = getFrameBoxes(ed.frame);
+  const f = boxes[ed.sel];
+  if (!f) return;
+  edPushUndo();
+  if (dir === "up") f.y = clamp(f.y - ED_NUDGE, 0, 1 - f.h);
+  else if (dir === "down") f.y = clamp(f.y + ED_NUDGE, 0, 1 - f.h);
+  else if (dir === "left") f.x = clamp(f.x - ED_NUDGE, 0, 1 - f.w);
+  else if (dir === "right") f.x = clamp(f.x + ED_NUDGE, 0, 1 - f.w);
+  edPersistFrame();
+  drawEditor();
+}
 function edRenderStageControls() {
   if (typeof STAGE_BG_PRESETS !== "undefined") {
     $("#ed-stage-bg").innerHTML = STAGE_BG_PRESETS.map(p =>
@@ -38,9 +72,12 @@ function edSyncUI() {
   $("#ed-add-box").disabled = boxes.length >= 4;
   $("#ed-del-box").disabled = boxes.length <= 1;
   $("#ed-swap").disabled = boxes.length <= 1;
-  $("#ed-sel").innerHTML = boxes.map((_, idx) =>
+  const selHtml = boxes.map((_, idx) =>
     `<button type="button" data-sel="${idx}" class="${idx === ed.sel ? "on" : ""}">${boxLabel(idx, boxes.length)}</button>`
   ).join("");
+  $("#ed-sel").innerHTML = selHtml;
+  if ($("#ed-prev-sel")) $("#ed-prev-sel").innerHTML = selHtml;
+  edSyncUndo();
   const presets = getLayoutPresets(boxes.length);
   if (!presets.some(p => p.id === ed.frame.layout)) ed.frame.layout = presets[0].id;
   const stTmp = ed.frame.stage || {};
@@ -127,7 +164,7 @@ async function openEditor(i) {
   try {
     await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
     state.vw = v.videoWidth; state.vh = v.videoHeight;
-    ed.index = i; ed.sel = 0;
+    ed.index = i; ed.sel = 0; ed.undo = [];
     const savedFrame = loadClipperPrefs().frame;
     const fallbackFrame = state.lastFrame || (savedFrame ? { ...defaultFrame(), fit: !!savedFrame.fit, divider: !!savedFrame.divider, dividerSize: dividerThickness(savedFrame), layout: savedFrame.layout || "stack", stage: savedFrame.stage } : defaultFrame());
     const rawFrame = clone(item.vFrame || fallbackFrame);
@@ -241,6 +278,7 @@ function edHit(p) {
 const edCanvas = $("#ed-canvas");
 edCanvas.addEventListener("pointerdown", e => {
   const hit = edHit(edPos(e)); if (!hit) return;
+  edPushUndo();
   if (hit.which !== ed.sel) { ed.sel = hit.which; edSyncUI(); }
   ed.drag = hit; edCanvas.setPointerCapture(e.pointerId); e.preventDefault(); drawEditor();
 });
@@ -263,12 +301,20 @@ edCanvas.addEventListener("pointermove", e => {
 });
 ["pointerup", "pointercancel"].forEach(t => edCanvas.addEventListener(t, () => { ed.drag = null; }));
 $("#ed-time").addEventListener("input", async e => { previewStop(); await edSeek(Number(e.target.value)); drawEditor(); });
-$("#ed-sel").addEventListener("click", e => {
-  const b = e.target.closest("button[data-sel]"); if (!b) return;
-  ed.sel = Number(b.dataset.sel); edSyncUI(); drawEditor();
+["#ed-sel", "#ed-prev-sel"].forEach(id => {
+  $(id)?.addEventListener("click", e => {
+    const b = e.target.closest("button[data-sel]"); if (!b) return;
+    ed.sel = Number(b.dataset.sel); edSyncUI(); drawEditor();
+  });
+});
+$("#ed-dpad")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-dir]");
+  if (b) { edNudgeBox(b.dataset.dir); return; }
+  if (e.target.closest("#ed-undo")) edDoUndo();
 });
 $("#ed-layout").addEventListener("click", e => {
   const b = e.target.closest("button[data-layout]"); if (!b) return;
+  edPushUndo();
   ed.frame.layout = b.dataset.layout; edPersistFrame(); edSyncUI(); drawEditor();
 });
 $("#ed-stage-mode").addEventListener("click", e => {
@@ -301,6 +347,7 @@ $("#ed-names-wrap").addEventListener("input", e => {
 $("#ed-add-box").addEventListener("click", () => {
   const boxes = getFrameBoxes(ed.frame);
   if (boxes.length >= 4) return;
+  edPushUndo();
   boxes.push(defaultBoxAt(boxes.length, boxes.length + 1));
   ed.sel = boxes.length - 1;
   edSyncUI(); drawEditor();
@@ -308,6 +355,7 @@ $("#ed-add-box").addEventListener("click", () => {
 $("#ed-del-box").addEventListener("click", () => {
   const boxes = getFrameBoxes(ed.frame);
   if (boxes.length <= 1) return;
+  edPushUndo();
   boxes.splice(ed.sel, 1);
   ed.sel = clamp(ed.sel, 0, boxes.length - 1);
   edSyncUI(); drawEditor();
@@ -316,11 +364,12 @@ $("#ed-fit").addEventListener("click", e => { const b = e.target.closest("button
 $("#ed-swap").addEventListener("click", () => {
   const boxes = getFrameBoxes(ed.frame);
   if (boxes.length < 2) return;
+  edPushUndo();
   const next = (ed.sel + 1) % boxes.length;
   [boxes[ed.sel], boxes[next]] = [boxes[next], boxes[ed.sel]];
   drawEditor();
 });
-$("#ed-reset").addEventListener("click", () => { ed.frame = defaultFrame(); ed.sel = 0; edPersistFrame(); edSyncUI(); drawEditor(); });
+$("#ed-reset").addEventListener("click", () => { edPushUndo(); ed.frame = defaultFrame(); ed.sel = 0; edPersistFrame(); edSyncUI(); drawEditor(); });
 $("#ed-overlays").addEventListener("click", () => {
   previewStop();
   const frame = clone(ed.frame), idx = ed.index;
@@ -357,3 +406,42 @@ $("#ed-all").addEventListener("click", () => { const frame = clone(ed.frame); cl
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#editor").hidden) closeEditor(); });
 window.addEventListener("resize", () => { if (!$("#editor").hidden && state.edVideo) drawEditor(); });
 window.addEventListener("orientationchange", () => setTimeout(() => { if (!$("#editor").hidden && state.edVideo) drawEditor(); }, 250));
+
+$("#open-vmaker")?.addEventListener("click", () => {
+  if (!IS_ANDROID_APP) {
+    toast("Download the Android app for this feature.", true);
+    $("#status").textContent = "Download the Android app to use the Vertical Maker.";
+    $("#app-note")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  if (state.busy) return;
+  $("#vmaker-files")?.click();
+});
+$("#vmaker-files")?.addEventListener("change", e => {
+  const files = [...(e.target.files || [])];
+  e.target.value = "";
+  if (!files.length) return;
+  resetOutputs();
+  const _prefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { anim: {} };
+  files.forEach((file, i) => {
+    const title = file.name.replace(/\.[^.]+$/, "") || `Clip ${i + 1}`;
+    const item = {
+      title,
+      start: 0,
+      end: 0,
+      caption: "",
+      note: "",
+      tags: [],
+      tagsText: "",
+      blob: file,
+      vAnim: clone(_prefs.anim || { enabled: false }),
+      name: `${String(i + 1).padStart(2, "0")}-${slug(title)}.mp4`,
+      url: URL.createObjectURL(file),
+    };
+    state.outputs.push(item);
+    $("#clip-list").insertAdjacentHTML("beforeend", cardHTML(item, i));
+  });
+  updateResultsHeader();
+  $("#status").textContent = `Imported ${files.length} video${files.length === 1 ? "" : "s"} into Vertical Maker.`;
+  openEditor(0);
+});
