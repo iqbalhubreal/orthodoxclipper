@@ -2,7 +2,57 @@
 /* Play / pause preview for the Vertical Maker and the Vertical Editor.
    Plays the clip with the real audio level driving the waveform and glow. If speaker detection is on, the first Play
    analyses the clip once (the result is cached on the clip and reused when you export). */
-const pv = { playing: false, raf: 0, token: 0, cfg: null, sound: true };
+const pv = { playing: false, raf: 0, token: 0, cfg: null, sound: true, audioCtx: null };
+
+function ensurePreviewAudioGraph(v) {
+  if (v._audioGraph) return v._audioGraph;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try {
+    const ctx = pv.audioCtx || (pv.audioCtx = new AC());
+    const src = ctx.createMediaElementSource(v);
+    const dry = ctx.createGain();
+    const wet = ctx.createGain();
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass"; hp.frequency.value = 85;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -24; comp.knee.value = 12; comp.ratio.value = 4;
+    comp.attack.value = 0.005; comp.release.value = 0.15;
+    const makeup = ctx.createGain();
+    makeup.gain.value = 1.55;
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20;
+    lim.attack.value = 0.002; lim.release.value = 0.05;
+    src.connect(dry); dry.connect(ctx.destination);
+    src.connect(hp); hp.connect(comp); comp.connect(makeup); makeup.connect(lim); lim.connect(wet); wet.connect(ctx.destination);
+    dry.gain.value = 1; wet.gain.value = 0;
+    v._audioGraph = { ctx, dry, wet };
+    return v._audioGraph;
+  } catch { return null; }
+}
+function applyPreviewPlayback(v, opts = {}) {
+  const speed = typeof clampSpeed === "function" ? clampSpeed(opts.speed) : (Number(opts.speed) || 1);
+  v.playbackRate = speed;
+  v.preservesPitch = true;
+  v.mozPreservesPitch = true;
+  v.webkitPreservesPitch = true;
+  const boost = !!opts.voiceBoost;
+  if (boost || v._audioGraph) {
+    const g = ensurePreviewAudioGraph(v);
+    if (g) {
+      if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
+      g.dry.gain.value = boost ? 0 : 1;
+      g.wet.gain.value = boost ? 1 : 0;
+    }
+  }
+}
+function previewApplyLive() {
+  if (!pv.playing || !pv.cfg) return;
+  applyPreviewPlayback(pv.cfg.video(), {
+    speed: pv.cfg.speed ? pv.cfg.speed() : 1,
+    voiceBoost: pv.cfg.voiceBoost ? pv.cfg.voiceBoost() : false,
+  });
+}
 
 /* Energy (audio level) and speaker levels to draw at time t. Used by editor.js and veditor.js. */
 function previewStageOpts(item, frame, t) {
@@ -57,6 +107,7 @@ async function previewToggle(cfg) {
   const v = cfg.video();
   if (v.ended || (v.duration && v.currentTime >= v.duration - 0.05)) v.currentTime = 0;
   v.muted = !pv.sound;
+  applyPreviewPlayback(v, { speed: cfg.speed ? cfg.speed() : 1, voiceBoost: cfg.voiceBoost ? cfg.voiceBoost() : false });
   try { await v.play(); } catch { toast("Your browser blocked playback. Tap Play again.", true); return; }
   if (token !== pv.token) { v.pause(); return; }
   pv.playing = true; pv.cfg = cfg;
@@ -79,5 +130,6 @@ $("#ed-play").addEventListener("click", () => previewToggle({
 $("#ved-play").addEventListener("click", () => previewToggle({
   video: () => ved.video, item: () => state.outputs[ved.index], frame: () => ved.frame,
   slider: $("#ved-time"), button: $("#ved-play"), draw: drawVEditor,
+  speed: () => ved.speed, voiceBoost: () => ved.voiceBoost,
 }));
 previewSyncButtons();

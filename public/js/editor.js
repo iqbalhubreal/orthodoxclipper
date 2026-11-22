@@ -19,6 +19,11 @@ function edSeek(t) {
     v.currentTime = Math.min(Math.max(0, t), v.duration || t);
   });
 }
+function edPersistFrame() {
+  if (!ed.frame) return;
+  state.lastFrame = clone(ed.frame);
+  saveClipperPrefs({ frame: { fit: !!ed.frame.fit, divider: !!ed.frame.divider, dividerSize: dividerThickness(ed.frame), layout: ed.frame.layout || "stack", stage: clone(ed.frame.stage) } });
+}
 function edRenderStageControls() {
   if (typeof STAGE_BG_PRESETS !== "undefined") {
     $("#ed-stage-bg").innerHTML = STAGE_BG_PRESETS.map(p =>
@@ -46,6 +51,11 @@ function edSyncUI() {
   ).join("");
   document.querySelectorAll("#ed-fit button").forEach(b => b.classList.toggle("on", (b.dataset.fit === "fit") === !!ed.frame.fit));
 
+  $("#ed-divider-wrap").hidden = boxes.length < 2 || !!stTmp.enabled;
+  $("#ed-divider").checked = !!ed.frame.divider;
+  const dSize = dividerThickness(ed.frame);
+  $("#ed-divider-size").value = dSize; $("#ed-divider-size-val").textContent = dSize;
+  $("#ed-divider-size-row").hidden = !ed.frame.divider;
   const st = ed.frame.stage || (ed.frame.stage = defaultStageConfig(state.outputs[ed.index]));
   const curStyle = st.enabled ? (st.style && st.style !== "classic" ? st.style : "2.5d") : "classic";
   document.querySelectorAll("#ed-stage-mode button").forEach(b => b.classList.toggle("on", b.dataset.style === curStyle));
@@ -115,9 +125,11 @@ async function openEditor(i) {
     await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
     state.vw = v.videoWidth; state.vh = v.videoHeight;
     ed.index = i; ed.sel = 0;
-    const rawFrame = clone(item.vFrame || state.lastFrame || defaultFrame());
+    const savedFrame = loadClipperPrefs().frame;
+    const fallbackFrame = state.lastFrame || (savedFrame ? { ...defaultFrame(), fit: !!savedFrame.fit, divider: !!savedFrame.divider, dividerSize: dividerThickness(savedFrame), layout: savedFrame.layout || "stack", stage: savedFrame.stage } : defaultFrame());
+    const rawFrame = clone(item.vFrame || fallbackFrame);
     const stage = typeof normalizeStageConfig === "function" ? normalizeStageConfig(rawFrame.stage, item) : { enabled: false };
-    ed.frame = { fit: !!rawFrame.fit, layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame), stage };
+    ed.frame = { fit: !!rawFrame.fit, divider: !!rawFrame.divider, dividerSize: dividerThickness(rawFrame), layout: rawFrame.layout || "stack", boxes: getFrameBoxes(rawFrame), stage };
     const slider = $("#ed-time");
     slider.min = 0; slider.max = v.duration || 1; slider.step = 0.1; slider.value = Math.min(PAD, (v.duration || 1) / 2);
     $("#ed-title").textContent = `Vertical Maker: ${item.title}`;
@@ -189,6 +201,7 @@ function drawEditor() {
     p.drawImage(v, m.sx, m.sy, m.sw, m.sh, dx + m.dx, dy + m.dy, m.dw, m.dh);
     p.strokeStyle = "rgba(255,255,255,.25)"; p.strokeRect(dx, dy, dw, dh);
   });
+  drawDividerLines(p, P.width, P.height, ed.frame);
 }
 function edPos(e) {
   const cv = $("#ed-canvas"), b = cv.getBoundingClientRect();
@@ -253,34 +266,36 @@ $("#ed-sel").addEventListener("click", e => {
 });
 $("#ed-layout").addEventListener("click", e => {
   const b = e.target.closest("button[data-layout]"); if (!b) return;
-  ed.frame.layout = b.dataset.layout; edSyncUI(); drawEditor();
+  ed.frame.layout = b.dataset.layout; edPersistFrame(); edSyncUI(); drawEditor();
 });
 $("#ed-stage-mode").addEventListener("click", e => {
   const b = e.target.closest("button[data-style]"); if (!b) return;
   const style = b.dataset.style || "classic";
   ed.frame.stage.style = style;
   ed.frame.stage.enabled = style !== "classic";
-  edSyncUI(); drawEditor();
+  edPersistFrame(); edSyncUI(); drawEditor();
 });
 $("#ed-stage-bg").addEventListener("click", e => {
   const b = e.target.closest("button[data-bg]"); if (!b) return;
   ed.frame.stage.bg = b.dataset.bg;
-  edSyncUI(); drawEditor();
+  edPersistFrame(); edSyncUI(); drawEditor();
 });
-$("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; edSyncUI(); drawEditor(); });
-$("#ed-stage-scale").addEventListener("input", e => { const pct = Number(e.target.value); ed.frame.stage.frameScale = pct / 100; $("#ed-stage-scale-val").textContent = pct; drawEditor(); });
-$("#ed-stage-wave").addEventListener("change", e => { ed.frame.stage.waveform = e.target.checked; drawEditor(); });
-$("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; edSyncUI(); drawEditor(); });
-$("#ed-stage-detect").addEventListener("change", e => { ed.frame.stage.detectSpeaker = e.target.checked; });
-$("#ed-stage-hookzone").addEventListener("change", e => { ed.frame.stage.hookGuide = e.target.checked; drawEditor(); });
-$("#ed-stage-subzone").addEventListener("change", e => { ed.frame.stage.subtitleSafeZone = e.target.checked; drawEditor(); });
-$("#ed-stage-nameplates").addEventListener("change", e => { ed.frame.stage.nameplates = e.target.checked; edSyncUI(); drawEditor(); });
+$("#ed-stage-focus").addEventListener("change", e => { ed.frame.stage.speakerFocus = e.target.value; edPersistFrame(); edSyncUI(); drawEditor(); });
+$("#ed-stage-scale").addEventListener("input", e => { const pct = Number(e.target.value); ed.frame.stage.frameScale = pct / 100; $("#ed-stage-scale-val").textContent = pct; edPersistFrame(); drawEditor(); });
+$("#ed-stage-wave").addEventListener("change", e => { ed.frame.stage.waveform = e.target.checked; edPersistFrame(); drawEditor(); });
+$("#ed-stage-glow").addEventListener("change", e => { ed.frame.stage.activeGlow = e.target.checked; edPersistFrame(); edSyncUI(); drawEditor(); });
+$("#ed-stage-detect").addEventListener("change", e => { ed.frame.stage.detectSpeaker = e.target.checked; edPersistFrame(); });
+$("#ed-divider").addEventListener("change", e => { ed.frame.divider = e.target.checked; edPersistFrame(); edSyncUI(); drawEditor(); });
+$("#ed-divider-size").addEventListener("input", e => { ed.frame.dividerSize = Number(e.target.value); $("#ed-divider-size-val").textContent = e.target.value; edPersistFrame(); drawEditor(); });
+$("#ed-stage-hookzone").addEventListener("change", e => { ed.frame.stage.hookGuide = e.target.checked; edPersistFrame(); drawEditor(); });
+$("#ed-stage-subzone").addEventListener("change", e => { ed.frame.stage.subtitleSafeZone = e.target.checked; edPersistFrame(); drawEditor(); });
+$("#ed-stage-nameplates").addEventListener("change", e => { ed.frame.stage.nameplates = e.target.checked; edPersistFrame(); edSyncUI(); drawEditor(); });
 $("#ed-names-wrap").addEventListener("input", e => {
   const inp = e.target.closest("input[data-name-idx]");
   if (!inp) return;
   if (!Array.isArray(ed.frame.stage.names)) ed.frame.stage.names = ["", "", "", ""];
   ed.frame.stage.names[Number(inp.dataset.nameIdx)] = inp.value;
-  drawEditor();
+  edPersistFrame(); drawEditor();
 });
 
 $("#ed-add-box").addEventListener("click", () => {
@@ -297,7 +312,7 @@ $("#ed-del-box").addEventListener("click", () => {
   ed.sel = clamp(ed.sel, 0, boxes.length - 1);
   edSyncUI(); drawEditor();
 });
-$("#ed-fit").addEventListener("click", e => { const b = e.target.closest("button[data-fit]"); if (!b) return; ed.frame.fit = b.dataset.fit === "fit"; edSyncUI(); drawEditor(); });
+$("#ed-fit").addEventListener("click", e => { const b = e.target.closest("button[data-fit]"); if (!b) return; ed.frame.fit = b.dataset.fit === "fit"; edPersistFrame(); edSyncUI(); drawEditor(); });
 $("#ed-swap").addEventListener("click", () => {
   const boxes = getFrameBoxes(ed.frame);
   if (boxes.length < 2) return;
@@ -305,7 +320,7 @@ $("#ed-swap").addEventListener("click", () => {
   [boxes[ed.sel], boxes[next]] = [boxes[next], boxes[ed.sel]];
   drawEditor();
 });
-$("#ed-reset").addEventListener("click", () => { ed.frame = defaultFrame(); ed.sel = 0; edSyncUI(); drawEditor(); });
+$("#ed-reset").addEventListener("click", () => { ed.frame = defaultFrame(); ed.sel = 0; edPersistFrame(); edSyncUI(); drawEditor(); });
 $("#ed-overlays").addEventListener("click", () => {
   previewStop();
   const frame = clone(ed.frame), idx = ed.index;

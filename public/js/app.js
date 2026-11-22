@@ -2,8 +2,10 @@
 /* Wires up buttons and inputs. Runs after everything else is defined. */
 window.__appHandlesClipDownload = true;
 try { $("#notes").value = localStorage.getItem("clipper.notes") || ""; } catch {}
+const _initPrefs = loadClipperPrefs();
+if ($("#maxlen")) $("#maxlen").value = _initPrefs.maxlen;
 $("#notes").addEventListener("input", notesChanged);
-$("#maxlen").addEventListener("change", () => { renderPrompt(); renderDetected(); });
+$("#maxlen").addEventListener("change", () => { saveClipperPrefs({ maxlen: $("#maxlen").value }); renderPrompt(); renderDetected(); });
 $("#yt").addEventListener("input", renderPrompt);
 $("#copy-prompt").addEventListener("click", () => copyText(buildPrompt(), $("#yt").value.trim() ? "Prompt copied. Paste it into Gemini." : "Prompt copied. Replace [PASTE YOUTUBE LINK HERE] with your link."));
 $("#paste").addEventListener("click", async () => {
@@ -17,6 +19,7 @@ $("#clear").addEventListener("click", () => { $("#notes").value = ""; notesChang
 function setMode(value) {
   $("#mode").value = value;
   document.querySelectorAll(".seg-btn").forEach(btn => { const on = btn.dataset.mode === value; btn.classList.toggle("on", on); btn.setAttribute("aria-checked", String(on)); });
+  if (!IS_ANDROID_APP) saveClipperPrefs({ mode: value });
   updateModeHint();
 }
 document.querySelectorAll(".seg-btn").forEach(btn => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
@@ -27,7 +30,7 @@ if (IS_ANDROID_APP) {
   const appNote = $("#app-note");
   if (appNote) appNote.hidden = true;
 } else {
-  setMode("fast");
+  setMode(_initPrefs.mode || "fast");
 }
 renderPrompt();
 renderDetected();

@@ -30,6 +30,33 @@ function getLayoutSlots(count, layoutId) {
   const presets = getLayoutPresets(count);
   return (presets.find(p => p.id === layoutId) || presets[0]).slots;
 }
+/* Optional red divider line at the junction(s) of the split screen. frame.divider (bool) turns it on; frame.dividerSize is the thickness in px on a 1080-wide video. */
+const DIVIDER_COLOR = "#e11d2e";
+function dividerThickness(f) { return Math.min(16, Math.max(2, Math.round(Number(f?.dividerSize) || 6))); }
+/* Lines between neighbouring slots, as normalized segments { x1, y1, x2, y2 } in 0..1 video space. */
+function getDividerSegments(count, layoutId) {
+  if (count < 2) return [];
+  const slots = getLayoutSlots(count, layoutId), seen = new Set(), out = [], e = 0.002, r = n => Math.round(n * 1000) / 1000;
+  const add = (x1, y1, x2, y2) => { const k = [x1, y1, x2, y2].map(r).join("_"); if (!seen.has(k)) { seen.add(k); out.push({ x1, y1, x2, y2 }); } };
+  for (const s of slots) {
+    if (s.x + s.w < 1 - e) add(s.x + s.w, s.y, s.x + s.w, s.y + s.h);
+    if (s.y + s.h < 1 - e) add(s.x, s.y + s.h, s.x + s.w, s.y + s.h);
+  }
+  return out;
+}
+function drawDividerLines(ctx, W, H, frame) {
+  if (!frame?.divider) return;
+  const segs = getDividerSegments(getFrameBoxes(frame).length, frame.layout);
+  if (!segs.length) return;
+  const t = Math.max(1, Math.round(dividerThickness(frame) * W / 1080));
+  ctx.save();
+  ctx.fillStyle = DIVIDER_COLOR;
+  for (const g of segs) {
+    if (g.y1 === g.y2) ctx.fillRect(Math.round(g.x1 * W), Math.round(g.y1 * H - t / 2), Math.round((g.x2 - g.x1) * W), t);
+    else ctx.fillRect(Math.round(g.x1 * W - t / 2), Math.round(g.y1 * H), t, Math.round((g.y2 - g.y1) * H));
+  }
+  ctx.restore();
+}
 function getFrameBoxes(f) {
   if (Array.isArray(f?.boxes) && f.boxes.length) return f.boxes;
   if (f?.a && f?.b) return [f.a, f.b];
@@ -65,7 +92,13 @@ function verticalFilter(f) {
   if (boxes.length === 1) return parts[0].replace("[b0]", "[v]");
   const inputs = boxes.map((_, idx) => `[b${idx}]`).join("");
   const layout = slots.map(s => `${even(s.x * W)}_${even(s.y * TOTAL_H)}`).join("|");
-  return `${parts.join(";")};${inputs}xstack=inputs=${boxes.length}:layout=${layout}[v]`;
+  const stack = `${parts.join(";")};${inputs}xstack=inputs=${boxes.length}:layout=${layout}`;
+  if (!f.divider) return `${stack}[v]`;
+  const t = even(dividerThickness(f)), segs = getDividerSegments(boxes.length, f.layout);
+  const draws = segs.map(g => g.y1 === g.y2
+    ? `drawbox=x=${Math.round(g.x1 * W)}:y=${Math.max(0, Math.round(g.y1 * TOTAL_H - t / 2))}:w=${Math.round((g.x2 - g.x1) * W)}:h=${t}:color=0xe11d2e:t=fill`
+    : `drawbox=x=${Math.max(0, Math.round(g.x1 * W - t / 2))}:y=${Math.round(g.y1 * TOTAL_H)}:w=${t}:h=${Math.round((g.y2 - g.y1) * TOTAL_H)}:color=0xe11d2e:t=fill`);
+  return draws.length ? `${stack}[vs];[vs]${draws.join(",")}[v]` : `${stack}[v]`;
 }
 async function runTask(fn, message) {
   if (state.busy) return;
@@ -157,6 +190,7 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
             for (const { m, xOff, yOff } of boxes) {
               sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
             }
+            drawDividerLines(targetCtx, W, TOTAL_H, frame);
           }
           if (layers.length) {
             ctx.drawImage(baseCv, 0, 0, W, TOTAL_H);
@@ -181,23 +215,63 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null) {
     try { input.dispose?.(); } catch {}
   }
 }
+function buildAudioFilter(speed, voiceBoost) {
+  const parts = [];
+  if (Math.abs(speed - 1) >= 0.01) parts.push(`atempo=${speed.toFixed(4)}`);
+  if (voiceBoost) parts.push("highpass=f=85,dynaudnorm=f=150:g=15:p=0.92:m=10,alimiter=limit=0.95");
+  return parts.join(",");
+}
+async function applyAudioSpeedFFmpeg(ff, i, blob, speed, voiceBoost) {
+  const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
+  showBusy(true, state.progressMessage);
+  const tmpIn = `vas_in_${i}.mp4`, tmpOut = `vas_out_${i}.mp4`;
+  await engine.writeFile(tmpIn, new Uint8Array(await blob.arrayBuffer()));
+  const hasSpeed = Math.abs(speed - 1) >= 0.01;
+  const af = buildAudioFilter(speed, voiceBoost);
+  const args = ["-i", tmpIn, "-map", "0:v", "-map", "0:a?"];
+  if (hasSpeed) {
+    args.push("-vf", `setpts=PTS/${speed.toFixed(4)}`, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p");
+  } else {
+    args.push("-c:v", "copy");
+  }
+  if (af) args.push("-af", af);
+  args.push("-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut);
+  const code = await Promise.race([engine.exec(args), state.cancelPromise]);
+  if (code !== 0) throw new Error(`Could not apply speed/audio to clip ${i + 1}.`);
+  const bytes = await engine.readFile(tmpOut);
+  try { await engine.deleteFile(tmpIn); await engine.deleteFile(tmpOut); } catch {}
+  return new Blob([bytes], { type: "video/mp4" });
+}
 async function makeVertical(ff, i, frame, onProgress) {
   const item = state.outputs[i];
   const clipFrame = clone(frame);
   item.vFrame = clone(clipFrame);
+  const _vedPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs().ved : { speed: 1, voiceBoost: false };
+  const speed = typeof clampSpeed === "function" ? clampSpeed(item.vSpeed ?? _vedPrefs.speed ?? 1) : 1;
+  const voiceBoost = item.vVoiceBoost !== undefined ? !!item.vVoiceBoost : !!_vedPrefs.voiceBoost;
+  const hasSpeed = Math.abs(speed - 1) >= 0.01;
   const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled;
   let vBlob = useWebCodecs
     ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress), state.cancelPromise])
     : null;
-  if (!vBlob) {
+  if (vBlob && (hasSpeed || voiceBoost)) {
+    vBlob = await applyAudioSpeedFFmpeg(ff, i, vBlob, speed, voiceBoost);
+  } else if (!vBlob) {
     const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
     showBusy(true, state.progressMessage);
     const tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
     await engine.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
-    const code = await Promise.race([engine.exec([
-      "-i", tmpIn, "-filter_complex", verticalFilter(clipFrame), "-map", "[v]", "-map", "0:a?",
-      "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut
-    ]), state.cancelPromise]);
+    let fc = verticalFilter(clipFrame);
+    let vMap = "[v]";
+    if (hasSpeed) {
+      fc += `;[v]setpts=PTS/${speed.toFixed(4)}[vsp]`;
+      vMap = "[vsp]";
+    }
+    const af = buildAudioFilter(speed, voiceBoost);
+    const args = ["-i", tmpIn, "-filter_complex", fc, "-map", vMap, "-map", "0:a?"];
+    if (af) args.push("-af", af);
+    args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut);
+    const code = await Promise.race([engine.exec(args), state.cancelPromise]);
     if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);
     const bytes = await engine.readFile(tmpOut);
     try { await engine.deleteFile(tmpIn); await engine.deleteFile(tmpOut); } catch {}
