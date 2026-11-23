@@ -413,21 +413,33 @@ function animComposeBase(v, ts) {
   if (anim.frame && v && v.videoWidth && v.videoHeight) {
     const boxes = getFrameBoxes(anim.frame), slots = typeof getFrameSlots === "function" ? getFrameSlots(anim.frame) : getLayoutSlots(boxes.length, anim.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
+    const sq = !!anim.frame.square1x1, cY = sq ? Math.round((H - W) / 2) : 0, cH = sq ? W : H;
+    bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H);
+    bctx.save();
+    if (sq) { bctx.beginPath(); bctx.rect(0, cY, W, cH); bctx.clip(); }
     if (anim.frame.stage?.enabled && typeof drawStageComposition === "function") {
+      if (sq) bctx.translate(0, cY);
       const opts = typeof previewStageOpts === "function" ? previewStageOpts(state.outputs[anim.index], anim.frame, ts) : { energy: 0.55, timestamp: ts };
-      drawStageComposition(bctx, v, sw, sh, boxes, anim.frame, W, H, { ...opts, showGuide: false });
+      drawStageComposition(bctx, v, sw, sh, boxes, anim.frame, W, cH, { ...opts, showGuide: false });
     } else {
       const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
-      bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H);
       boxes.forEach((box, idx) => {
-        const sl = slots[idx], dx = Math.round(sl.x * W), dy = Math.round(sl.y * H), dw = Math.round(sl.w * W), dh = Math.round(sl.h * H);
+        const sl = slots[idx], dx = Math.round(sl.x * W), dy = cY + Math.round(sl.y * cH), dw = Math.round(sl.w * W), dh = Math.round(sl.h * cH);
         const m = mapBox(px(box), dw, dh, anim.frame.fit);
         bctx.drawImage(v, m.sx, m.sy, m.sw, m.sh, dx + m.dx, dy + m.dy, m.dw, m.dh);
       });
-      if (typeof drawDividerLines === "function") drawDividerLines(bctx, W, H, anim.frame);
+      if (typeof drawDividerLines === "function") {
+        if (sq) { bctx.translate(0, cY); drawDividerLines(bctx, W, cH, anim.frame); }
+        else drawDividerLines(bctx, W, H, anim.frame);
+      }
     }
+    bctx.restore();
     if (anim.layers.length && typeof drawVerticalLayers === "function") {
-      drawVerticalLayers(bctx, anim.baseCv, W, H, anim.layers);
+      drawVerticalLayers(bctx, anim.baseCv, W, H, anim.layers, ts);
+    }
+    const capCfg = state.outputs[anim.index]?.vCaptions;
+    if (capCfg?.enabled && typeof drawCaptions === "function") {
+      drawCaptions(bctx, W, H, capCfg, ts);
     }
   } else {
     bctx.fillStyle = "#0f1018";

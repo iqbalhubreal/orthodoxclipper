@@ -131,9 +131,172 @@ async function runTask(fn, message) {
     showBusy(false);
   }
 }
+async function buildMixedAudioBuffer(item, silenceCfg, bgmCfg, targetDur) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  const ac = new AC();
+  try {
+    let voiceBuf = null;
+    try { voiceBuf = await ac.decodeAudioData(await item.blob.arrayBuffer()); } catch {}
+    const sr = voiceBuf ? voiceBuf.sampleRate : 44100;
+    const chs = voiceBuf ? Math.min(2, voiceBuf.numberOfChannels) : 2;
+    let outLen = Math.max(1, Math.round(targetDur * sr));
+    let outCh = Array.from({ length: chs }, () => new Float32Array(outLen));
+    if (voiceBuf) {
+      if (silenceCfg?.enabled && silenceCfg.segments?.length) {
+        const segs = silenceCfg.segments;
+        outLen = Math.max(1, segs.reduce((acc, g) => acc + Math.max(1, Math.round((g.end - g.start) * sr)), 0));
+        outCh = Array.from({ length: chs }, () => new Float32Array(outLen));
+        const fade = Math.min(Math.round(sr * 0.005), 256);
+        let writePos = 0;
+        for (const g of segs) {
+          const s0 = Math.max(0, Math.round(g.start * sr));
+          const s1 = Math.min(voiceBuf.length, Math.round(g.end * sr));
+          const segLen = Math.max(0, s1 - s0);
+          for (let c = 0; c < chs; c++) {
+            const src = voiceBuf.getChannelData(Math.min(c, voiceBuf.numberOfChannels - 1));
+            for (let i = 0; i < segLen && writePos + i < outLen; i++) {
+              let gain = 1;
+              if (i < fade) gain = i / fade;
+              else if (i > segLen - fade) gain = (segLen - i) / fade;
+              outCh[c][writePos + i] = src[s0 + i] * gain;
+            }
+          }
+          writePos += segLen;
+        }
+      } else {
+        for (let c = 0; c < chs; c++) {
+          const src = voiceBuf.getChannelData(Math.min(c, voiceBuf.numberOfChannels - 1));
+          outCh[c].set(src.subarray(0, Math.min(src.length, outLen)));
+        }
+      }
+    }
+    if (bgmCfg?.blob) {
+      const bgmBuf = await ac.decodeAudioData(await bgmCfg.blob.arrayBuffer());
+      const vol = clamp(Number(bgmCfg.volume) || 0.15, 0.02, 0.8);
+      const fadeOut = Math.round(sr * 0.5);
+      for (let c = 0; c < chs; c++) {
+        const mSrc = bgmBuf.getChannelData(Math.min(c, bgmBuf.numberOfChannels - 1));
+        const mLen = mSrc.length;
+        for (let i = 0; i < outLen; i++) {
+          const fade = i > outLen - fadeOut ? Math.max(0, (outLen - i) / fadeOut) : 1;
+          const v = outCh[c][i] + mSrc[i % mLen] * vol * fade;
+          outCh[c][i] = Math.max(-0.98, Math.min(0.98, v));
+        }
+      }
+    }
+    const finalBuf = ac.createBuffer(chs, outLen, sr);
+    for (let c = 0; c < chs; c++) finalBuf.copyToChannel(outCh[c], c);
+    return finalBuf;
+  } finally {
+    try { await ac.close(); } catch {}
+  }
+}
+
+async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg) {
+  const { Input, Output, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget, VideoSampleSink, CanvasSource, AudioBufferSource } = mb;
+  const W = 1080, TOTAL_H = 1920, FPS = 30;
+  const frameBoxes = getFrameBoxes(frame), slots = getFrameSlots(frame);
+  const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
+  const stageEnabled = !!(frame.stage?.enabled && typeof drawStageComposition === "function");
+  const animEnabled = !!(animCfg?.enabled && typeof animatorRenderAt === "function");
+  const silenceCfg = item.vSilence?.enabled && item.vSilence.segments?.length ? item.vSilence : null;
+  const bgmCfg = item.vBgm?.blob ? item.vBgm : null;
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.blob) });
+  try {
+    const duration = await input.computeDuration().catch(() => 10);
+    const segs = silenceCfg ? silenceCfg.segments : [{ start: 0, end: duration }];
+    const outOffsets = [];
+    let outDur = 0;
+    for (const g of segs) { outOffsets.push(outDur); outDur += Math.max(0, g.end - g.start); }
+    const mixedAudio = await buildMixedAudioBuffer(item, silenceCfg, bgmCfg, outDur || duration);
+    const outCanvas = Object.assign(document.createElement("canvas"), { width: W, height: TOTAL_H });
+    const ctx = outCanvas.getContext("2d", { alpha: false });
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "medium";
+    const baseCv = layers.length ? Object.assign(document.createElement("canvas"), { width: W, height: TOTAL_H }) : null;
+    const baseCtx = baseCv ? baseCv.getContext("2d", { alpha: false }) : null;
+    const animSrcCv = animEnabled ? Object.assign(document.createElement("canvas"), { width: W, height: TOTAL_H }) : null;
+    const animSrcCtx = animSrcCv ? animSrcCv.getContext("2d", { alpha: false }) : null;
+
+    const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
+    const videoSource = new CanvasSource(outCanvas, { codec: "avc", bitrate: 5_000_000, hardwareAcceleration: "prefer-hardware" });
+    output.addVideoTrack(videoSource, { frameRate: FPS });
+    let audioSource = null;
+    if (mixedAudio) {
+      audioSource = new AudioBufferSource({ codec: "aac", bitrate: 128_000 });
+      output.addAudioTrack(audioSource);
+    }
+    await output.start();
+    const videoTrack = await input.getPrimaryVideoTrack();
+    const sink = new VideoSampleSink(videoTrack);
+    let boxes = null, sw = 0, sh = 0, segIdx = 0, lastOutTs = -1;
+    const sq = !!frame?.square1x1, cY = sq ? Math.round((TOTAL_H - W) / 2) : 0, cH = sq ? W : TOTAL_H;
+    for await (const sample of sink.samples()) {
+      if (state.cancelled) { sample.close(); throw new Error("Cancelled"); }
+      const ts = sample.timestamp;
+      while (segIdx < segs.length && ts > segs[segIdx].end + 0.005) segIdx++;
+      if (segIdx >= segs.length) { sample.close(); break; }
+      if (ts < segs[segIdx].start - 0.005) { sample.close(); continue; }
+      const outTs = Math.max(lastOutTs + 1 / 60, outOffsets[segIdx] + Math.max(0, ts - segs[segIdx].start));
+      lastOutTs = outTs;
+      if (!boxes) {
+        sw = sample.displayWidth; sh = sample.displayHeight;
+        const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
+        boxes = frameBoxes.map((box, idx) => {
+          const s = slots[idx];
+          const dx = Math.round(s.x * W), dy = cY + Math.round(s.y * cH), dw = Math.round(s.w * W), dh = Math.round(s.h * cH);
+          return { m: mapBox(px(box), dw, dh, frame.fit), xOff: dx, yOff: dy };
+        });
+      }
+      const compCtx = animEnabled ? animSrcCtx : ctx;
+      const targetCtx = baseCtx || compCtx;
+      targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H);
+      targetCtx.save();
+      if (sq) { targetCtx.beginPath(); targetCtx.rect(0, cY, W, cH); targetCtx.clip(); }
+      if (stageEnabled) {
+        if (sq) targetCtx.translate(0, cY);
+        drawStageComposition(targetCtx, sample, sw, sh, frameBoxes, frame, W, cH, { energy: 0.45, timestamp: outTs });
+      } else {
+        for (const { m, xOff, yOff } of boxes) sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
+        if (sq) { targetCtx.translate(0, cY); drawDividerLines(targetCtx, W, cH, frame); }
+        else drawDividerLines(targetCtx, W, TOTAL_H, frame);
+      }
+      targetCtx.restore();
+      if (layers.length) {
+        compCtx.drawImage(baseCv, 0, 0, W, TOTAL_H);
+        drawVerticalLayers(compCtx, baseCv, W, TOTAL_H, layers, outTs);
+      }
+      if (item.vCaptions?.enabled && typeof drawCaptions === "function") {
+        drawCaptions(compCtx, W, TOTAL_H, item.vCaptions, outTs);
+      }
+      if (animEnabled) animatorRenderAt(outTs, ctx, animSrcCv, animCfg, W, TOTAL_H, outDur || duration);
+      const dur = Math.max(1 / 60, sample.duration || 1 / FPS);
+      sample.close();
+      await videoSource.add(outTs, dur);
+      if (onProgress && duration > 0) onProgress(Math.min(0.95, ts / duration));
+    }
+    if (audioSource && mixedAudio) await audioSource.add(mixedAudio);
+    videoSource.close();
+    audioSource?.close();
+    await output.finalize();
+    if (onProgress) onProgress(1);
+    return new Blob([output.target.buffer], { type: "video/mp4" });
+  } finally {
+    try { input.dispose?.(); } catch {}
+  }
+}
+
 async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, animCfg = null) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
+  if ((item.vSilence?.enabled && item.vSilence.segments?.length) || item.vBgm?.blob) {
+    try {
+      return await makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg);
+    } catch (err) {
+      if (state.cancelled) throw err;
+      console.warn("Custom AV pipeline failed, falling back:", err);
+    }
+  }
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
   const W = 1080, TOTAL_H = 1920, FPS = 30;
   const frameBoxes = getFrameBoxes(frame);
@@ -165,10 +328,11 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
           if (!ctx) {
             sw = sample.displayWidth; sh = sample.displayHeight;
             const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
+            const sq = !!frame?.square1x1, cY = sq ? Math.round((TOTAL_H - W) / 2) : 0, cH = sq ? W : TOTAL_H;
             boxes = frameBoxes.map((box, idx) => {
               const s = slots[idx];
-              const dx = Math.round(s.x * W), dy = Math.round(s.y * TOTAL_H);
-              const dw = Math.round(s.w * W), dh = Math.round(s.h * TOTAL_H);
+              const dx = Math.round(s.x * W), dy = cY + Math.round(s.y * cH);
+              const dw = Math.round(s.w * W), dh = Math.round(s.h * cH);
               return { m: mapBox(px(box), dw, dh, frame.fit), xOff: dx, yOff: dy };
             });
             const canvas = typeof OffscreenCanvas !== "undefined"
@@ -195,23 +359,32 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
           const ts = typeof sample.timestamp === "number" ? sample.timestamp : frameCount / FPS;
           const compCtx = animEnabled ? animSrcCtx : ctx;
           const targetCtx = baseCtx || compCtx;
+          const sq = !!frame?.square1x1, cY = sq ? Math.round((TOTAL_H - W) / 2) : 0, cH = sq ? W : TOTAL_H;
+          targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H);
+          targetCtx.save();
+          if (sq) { targetCtx.beginPath(); targetCtx.rect(0, cY, W, cH); targetCtx.clip(); }
           if (stageEnabled) {
             const envIdx = audioEnv ? Math.min(audioEnv.length - 1, Math.max(0, Math.floor(ts * FPS))) : 0;
             const energy = audioEnv ? audioEnv[envIdx] : (0.28 + 0.2 * Math.abs(Math.sin(ts * 4)));
-            drawStageComposition(targetCtx, sample, sw, sh, frameBoxes, frame, W, TOTAL_H, {
+            if (sq) targetCtx.translate(0, cY);
+            drawStageComposition(targetCtx, sample, sw, sh, frameBoxes, frame, W, cH, {
               energy,
               timestamp: ts,
             });
           } else {
-            targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H);
             for (const { m, xOff, yOff } of boxes) {
               sample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
             }
-            drawDividerLines(targetCtx, W, TOTAL_H, frame);
+            if (sq) { targetCtx.translate(0, cY); drawDividerLines(targetCtx, W, cH, frame); }
+            else drawDividerLines(targetCtx, W, TOTAL_H, frame);
           }
+          targetCtx.restore();
           if (layers.length) {
             compCtx.drawImage(baseCv, 0, 0, W, TOTAL_H);
-            drawVerticalLayers(compCtx, baseCv, W, TOTAL_H, layers);
+            drawVerticalLayers(compCtx, baseCv, W, TOTAL_H, layers, ts);
+          }
+          if (item.vCaptions?.enabled && typeof drawCaptions === "function") {
+            drawCaptions(compCtx, W, TOTAL_H, item.vCaptions, ts);
           }
           if (animEnabled) {
             animatorRenderAt(ts, ctx, animSrcCv, animCfg, W, TOTAL_H, clipDuration);
@@ -242,7 +415,7 @@ async function makeVertical(ff, i, frame, onProgress) {
   item.vFrame = clone(clipFrame);
   const _allPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { anim: { enabled: false } };
   const animCfg = clone(item.vAnim || _allPrefs.anim || { enabled: false });
-  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled || !!animCfg.enabled;
+  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled || !!animCfg.enabled || !!clipFrame.square1x1 || !!(item.vLayers && item.vLayers.length) || !!item.vSilence?.enabled || !!item.vBgm?.blob || !!item.vCaptions?.enabled;
   let vBlob = useWebCodecs
     ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress, null, animCfg), state.cancelPromise])
     : null;

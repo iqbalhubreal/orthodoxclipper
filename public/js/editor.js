@@ -23,7 +23,7 @@ function edSeek(t) {
 function edPersistFrame() {
   if (!ed.frame) return;
   state.lastFrame = clone(ed.frame);
-  saveClipperPrefs({ frame: { fit: !!ed.frame.fit, divider: !!ed.frame.divider, dividerSize: dividerThickness(ed.frame), layout: ed.frame.layout || "stack", stage: clone(ed.frame.stage) } });
+  saveClipperPrefs({ frame: { fit: !!ed.frame.fit, square1x1: !!ed.frame.square1x1, divider: !!ed.frame.divider, dividerSize: dividerThickness(ed.frame), layout: ed.frame.layout || "stack", stage: clone(ed.frame.stage) } });
 }
 function edSyncUndo() {
   const btn = $("#ed-undo");

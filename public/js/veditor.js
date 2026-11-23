@@ -1,6 +1,6 @@
 "use strict";
 /* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text only in Individual mode). */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all" };
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", silSens: "normal", silence: null, bgm: null, bgmAudio: null, faceLandmarker: null, capModel: "tiny", captions: null, transcribers: {} };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -12,13 +12,18 @@ const VED_FONTS = [
   { id: "sharp", name: "Sharp", weight: 700, family: '"Roboto", system-ui, sans-serif' },
   { id: "poster", name: "Poster", weight: 400, family: '"Bebas Neue", "Oswald", sans-serif' },
 ];
-const VED_COLORS = ["#ffffff", "#000000", "#38bdf8", "#f0b35a", "#42c98b", "#ff5a5f"];
+const VED_COLORS = ["#ffffff", "#000000", "#facc15", "#e11d2e", "#38bdf8", "#f0b35a", "#42c98b", "#ff5a5f"];
 
 function cloneLayers(layers) {
   return (layers || []).map(l => {
-    const copy = { kind: l.kind, x: l.x, y: l.y, w: l.w, h: l.h };
+    const copy = {
+      kind: l.kind, x: l.x, y: l.y, w: l.w, h: l.h,
+      opacity: l.opacity == null ? 1 : clamp(Number(l.opacity) || 1, 0.05, 1),
+      startTime: Math.max(0, Number(l.startTime) || 0),
+      endTime: (l.endTime !== "" && l.endTime != null && Number(l.endTime) > 0) ? Number(l.endTime) : null,
+    };
     if (l.kind === "blur") { copy.blurType = l.blurType; copy.amount = l.amount; }
-    else if (l.kind === "text") { copy.text = l.text; copy.fontId = l.fontId; copy.fontSize = l.fontSize; copy.color = l.color; copy.bg = l.bg; copy.align = l.align || "center"; }
+    else if (l.kind === "text") { copy.text = l.text; copy.fontId = l.fontId; copy.fontSize = l.fontSize; copy.color = l.color; copy.bg = l.bg; copy.fx = l.fx || (l.bg === "none" ? "shadow" : "none"); copy.align = l.align || "center"; }
     else { copy.name = l.name; copy.url = l.url; copy.aspect = l.aspect; }
     return copy;
   });
@@ -117,33 +122,57 @@ function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
   ctx.beginPath();
   ctx.rect(rx, ry, rw, rh);
   ctx.clip();
-  ctx.fillStyle = l.color || "#ffffff";
-  if (l.bg === "none") {
-    ctx.shadowColor = "rgba(0,0,0,0.75)";
-    ctx.shadowBlur = Math.round(7 * s);
-    ctx.shadowOffsetY = Math.round(2 * s);
-  }
+  const fx = l.fx || (l.bg === "none" ? "shadow" : "none");
   const totalH = lines.length * lineH;
   const startY = ry + (rh - totalH) / 2 + lineH / 2;
   const tx = align === "left" ? rx + padX : align === "right" ? rx + rw - padX : rx + rw / 2;
+  if (fx === "outline") {
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(2, Math.round(pxSize * 0.14));
+    ctx.strokeStyle = "#000000";
+    ctx.shadowColor = "rgba(0,0,0,0.65)";
+    ctx.shadowBlur = Math.round(6 * s);
+    ctx.shadowOffsetY = Math.round(2 * s);
+    lines.forEach((line, idx) => ctx.strokeText(line, tx, startY + idx * lineH));
+    ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  } else if (fx === "glow") {
+    ctx.shadowColor = l.color || "#ffffff";
+    ctx.shadowBlur = Math.round(18 * s);
+    ctx.shadowOffsetY = 0;
+    ctx.fillStyle = l.color || "#ffffff";
+    lines.forEach((line, idx) => ctx.fillText(line, tx, startY + idx * lineH));
+    ctx.shadowBlur = Math.round(8 * s);
+  } else if (fx === "shadow") {
+    ctx.shadowColor = "rgba(0,0,0,0.82)";
+    ctx.shadowBlur = Math.round(8 * s);
+    ctx.shadowOffsetY = Math.round(2.5 * s);
+  }
+  ctx.fillStyle = l.color || "#ffffff";
   lines.forEach((line, idx) => ctx.fillText(line, tx, startY + idx * lineH));
   ctx.restore();
 }
-function drawVerticalLayers(ctx, baseCv, W, H, layers) {
+function drawVerticalLayers(ctx, baseCv, W, H, layers, timeSec = null) {
   const s = W / 540;
   for (const l of layers) {
+    if (timeSec != null && Number.isFinite(timeSec)) {
+      const st = Math.max(0, Number(l.startTime) || 0);
+      const hasEnd = l.endTime !== "" && l.endTime != null && Number(l.endTime) > 0;
+      const en = hasEnd ? Number(l.endTime) : Infinity;
+      if (timeSec < st - 0.001 || timeSec > en + 0.001) continue;
+    }
+    const alpha = l.opacity == null ? 1 : clamp(Number(l.opacity) || 1, 0.05, 1);
     const rx = Math.round(l.x * W), ry = Math.round(l.y * H);
     const rw = Math.max(2, Math.round(l.w * W)), rh = Math.max(2, Math.round(l.h * H));
+    ctx.save();
+    ctx.globalAlpha *= alpha;
     if (l.kind === "blur") {
       if (l.blurType === "pixel") {
         const block = Math.max(4, Math.round(l.amount * s));
         const pw = Math.max(1, Math.round(rw / block)), ph = Math.max(1, Math.round(rh / block));
         ved.pixCv = ensureCanvas(ved.pixCv, pw, ph);
         ved.pixCv.getContext("2d").drawImage(baseCv, rx, ry, rw, rh, 0, 0, pw, ph);
-        ctx.save();
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(ved.pixCv, 0, 0, pw, ph, rx, ry, rw, rh);
-        ctx.restore();
       } else {
         drawEdgePaddedBlur(ctx, baseCv, W, H, rx, ry, rw, rh, Math.max(1, Math.round(l.amount * s)), l.blurType === "frosted");
       }
@@ -152,7 +181,66 @@ function drawVerticalLayers(ctx, baseCv, W, H, layers) {
     } else if (l.kind === "text") {
       drawTextLayer(ctx, l, rx, ry, rw, rh, s);
     }
+    ctx.restore();
   }
+}
+function drawCaptions(ctx, W, H, capCfg, timeSec) {
+  const words = capCfg?.words;
+  if (!capCfg?.enabled || !Array.isArray(words) || !words.length) return;
+  const t = Number(timeSec) || 0;
+  let activeIdx = -1;
+  for (let i = 0; i < words.length; i++) {
+    if (t >= words[i].start - 0.04 && t <= words[i].end + 0.08) { activeIdx = i; break; }
+  }
+  if (activeIdx < 0) return;
+  const s = W / 540;
+  const style = capCfg.style || "highlight";
+  const hlColor = capCfg.color || "#facc15";
+  const pxSize = Math.max(14, Math.round((capCfg.fontSize || 40) * s));
+  const cy = Math.round(clamp(Number(capCfg.y) || 0.72, 0.1, 0.92) * H);
+
+  ctx.save();
+  ctx.font = `800 ${pxSize}px "Montserrat", "Inter", system-ui, sans-serif`;
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(3, Math.round(pxSize * 0.18));
+  ctx.strokeStyle = "#000000";
+  ctx.shadowColor = "rgba(0,0,0,0.8)";
+  ctx.shadowBlur = Math.round(8 * s);
+  ctx.shadowOffsetY = Math.round(2 * s);
+
+  if (style === "word") {
+    const txt = String(words[activeIdx].word || "").toUpperCase();
+    ctx.textAlign = "center";
+    ctx.strokeText(txt, W / 2, cy);
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = hlColor;
+    ctx.fillText(txt, W / 2, cy);
+    ctx.restore();
+    return;
+  }
+
+  const groupSize = 3;
+  const gStart = Math.floor(activeIdx / groupSize) * groupSize;
+  const group = words.slice(gStart, Math.min(words.length, gStart + groupSize));
+  const labels = group.map(w => style === "highlight" ? String(w.word || "").toUpperCase() : String(w.word || ""));
+  const spaceW = ctx.measureText(" ").width;
+  const widths = labels.map(txt => ctx.measureText(txt).width);
+  const totalW = widths.reduce((a, b) => a + b, 0) + spaceW * Math.max(0, labels.length - 1);
+  let x = (W - totalW) / 2;
+  ctx.textAlign = "left";
+  group.forEach((w, idx) => {
+    const txt = labels[idx];
+    const isCur = (gStart + idx) === activeIdx;
+    ctx.strokeText(txt, x, cy);
+    ctx.save();
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = (style === "highlight" && isCur) ? hlColor : "#ffffff";
+    ctx.fillText(txt, x, cy);
+    ctx.restore();
+    x += widths[idx] + spaceW;
+  });
+  ctx.restore();
 }
 function drawVEditor() {
   const v = ved.video, cv = $("#ved-canvas"), ctx = cv.getContext("2d");
@@ -161,29 +249,37 @@ function drawVEditor() {
   const u = 1 / ved.k, W = cv.width, H = cv.height;
   ved.baseCv = ensureCanvas(ved.baseCv, W, H);
   const bctx = ved.baseCv.getContext("2d");
+  const curTime = Number(v.currentTime) || Number($("#ved-time").value) || 0;
   if (ved.frame && v.videoWidth && v.videoHeight) {
     const boxes = getFrameBoxes(ved.frame), slots = typeof getFrameSlots === "function" ? getFrameSlots(ved.frame) : getLayoutSlots(boxes.length, ved.frame.layout);
     const sw = v.videoWidth, sh = v.videoHeight;
+    const sq = !!ved.frame.square1x1, cY = sq ? Math.round((H - W) / 2) : 0, cH = sq ? W : H;
+    bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H);
+    bctx.save();
+    if (sq) { bctx.beginPath(); bctx.rect(0, cY, W, cH); bctx.clip(); }
     if (ved.frame.stage?.enabled && typeof drawStageComposition === "function") {
-      drawStageComposition(bctx, v, sw, sh, boxes, ved.frame, W, H, {
-        ...previewStageOpts(state.outputs[ved.index], ved.frame, Number($("#ved-time").value) || 0),
+      if (sq) bctx.translate(0, cY);
+      drawStageComposition(bctx, v, sw, sh, boxes, ved.frame, W, cH, {
+        ...previewStageOpts(state.outputs[ved.index], ved.frame, curTime),
         showGuide: false,
       });
     } else {
       const px = r => ({ x: r.x * sw, y: r.y * sh, w: r.w * sw, h: r.h * sh });
-      bctx.fillStyle = "#000"; bctx.fillRect(0, 0, W, H);
       boxes.forEach((box, idx) => {
-        const sl = slots[idx], dx = Math.round(sl.x * W), dy = Math.round(sl.y * H), dw = Math.round(sl.w * W), dh = Math.round(sl.h * H);
+        const sl = slots[idx], dx = Math.round(sl.x * W), dy = cY + Math.round(sl.y * cH), dw = Math.round(sl.w * W), dh = Math.round(sl.h * cH);
         const m = mapBox(px(box), dw, dh, ved.frame.fit);
         bctx.drawImage(v, m.sx, m.sy, m.sw, m.sh, dx + m.dx, dy + m.dy, m.dw, m.dh);
       });
-      drawDividerLines(bctx, W, H, ved.frame);
+      if (sq) { bctx.translate(0, cY); drawDividerLines(bctx, W, cH, ved.frame); }
+      else drawDividerLines(bctx, W, H, ved.frame);
     }
+    bctx.restore();
   } else {
     bctx.drawImage(v, 0, 0, W, H);
   }
   ctx.drawImage(ved.baseCv, 0, 0, W, H);
-  drawVerticalLayers(ctx, ved.baseCv, W, H, ved.layers);
+  drawVerticalLayers(ctx, ved.baseCv, W, H, ved.layers, curTime);
+  if (ved.captions?.enabled) drawCaptions(ctx, W, H, ved.captions, curTime);
 
   if (ved.guides) {
     ctx.save();
@@ -227,7 +323,42 @@ function vedSyncControls() {
   const isIndiv = ved.scope === "individual";
   $("#ved-add-text").hidden = !isIndiv;
   document.querySelectorAll("#ved-scope button").forEach(b => b.classList.toggle("on", b.dataset.scope === ved.scope));
+  const sqOn = !!ved.frame?.square1x1;
+  document.querySelectorAll("#ved-aspect button").forEach(b => b.classList.toggle("on", (b.dataset.aspect === "square") === sqOn));
   vedSyncClipBar();
+  document.querySelectorAll("#ved-sil-sens button").forEach(b => b.classList.toggle("on", b.dataset.sens === (ved.silSens || "normal")));
+  if ($("#ved-sil-status")) {
+    $("#ved-sil-status").textContent = ved.silence?.enabled
+      ? `Trimmed ${ved.silence.pauseCount} pause${ved.silence.pauseCount === 1 ? "" : "s"} (${ved.silence.savedSec.toFixed(1)}s saved)`
+      : "Off";
+  }
+  if ($("#ved-sil-reset")) $("#ved-sil-reset").hidden = !ved.silence?.enabled;
+  if ($("#ved-bgm-name")) $("#ved-bgm-name").textContent = ved.bgm?.blob ? (ved.bgm.name || "Audio track") : "None";
+  if ($("#ved-bgm-clear")) $("#ved-bgm-clear").hidden = !ved.bgm?.blob;
+  if ($("#ved-bgm-vol-wrap")) $("#ved-bgm-vol-wrap").hidden = !ved.bgm?.blob;
+  const volPct = Math.round((ved.bgm?.volume ?? 0.15) * 100);
+  if ($("#ved-bgm-vol")) $("#ved-bgm-vol").value = volPct;
+  if ($("#ved-bgm-vol-val")) $("#ved-bgm-vol-val").textContent = volPct;
+  document.querySelectorAll("#ved-cap-model button").forEach(b => b.classList.toggle("on", b.dataset.cmodel === (ved.capModel || "tiny")));
+  const hasCap = !!(ved.captions?.enabled && ved.captions.words?.length);
+  if ($("#ved-cap-status") && !$("#ved-cap-gen")?.disabled) {
+    $("#ved-cap-status").textContent = hasCap ? `${ved.captions.words.length} words ready` : "Off";
+  }
+  if ($("#ved-cap-clear")) $("#ved-cap-clear").hidden = !hasCap;
+  if ($("#ved-cap-opts")) $("#ved-cap-opts").hidden = !hasCap;
+  if (hasCap) {
+    document.querySelectorAll("#ved-cap-style button").forEach(b => b.classList.toggle("on", b.dataset.cstyle === (ved.captions.style || "highlight")));
+    document.querySelectorAll("#ved-cap-colors button").forEach(b => b.classList.toggle("on", b.dataset.ccolor === (ved.captions.color || "#facc15")));
+    const cSz = ved.captions.fontSize || 40;
+    if ($("#ved-cap-size")) $("#ved-cap-size").value = cSz;
+    if ($("#ved-cap-size-val")) $("#ved-cap-size-val").textContent = cSz;
+    const cY = Math.round((ved.captions.y || 0.72) * 100);
+    if ($("#ved-cap-y")) $("#ved-cap-y").value = cY;
+    if ($("#ved-cap-y-val")) $("#ved-cap-y-val").textContent = cY;
+    if ($("#ved-cap-text") && document.activeElement !== $("#ved-cap-text")) {
+      $("#ved-cap-text").value = ved.captions.words.map(w => w.word).join(" ");
+    }
+  }
 
   if (!isIndiv && ved.layers[ved.sel]?.kind === "text") ved.sel = -1;
   const l = ved.layers[ved.sel];
@@ -235,6 +366,11 @@ function vedSyncControls() {
   if (!l) return;
   $("#ved-blur-opts").hidden = l.kind !== "blur";
   $("#ved-text-opts").hidden = !(l.kind === "text" && isIndiv);
+  const opPct = Math.round((l.opacity == null ? 1 : clamp(Number(l.opacity) || 1, 0.05, 1)) * 100);
+  if ($("#ved-opacity")) $("#ved-opacity").value = opPct;
+  if ($("#ved-opacity-val")) $("#ved-opacity-val").textContent = opPct;
+  if ($("#ved-t-start")) $("#ved-t-start").value = l.startTime ? Number(l.startTime) : "";
+  if ($("#ved-t-end")) $("#ved-t-end").value = (l.endTime != null && Number(l.endTime) > 0) ? Number(l.endTime) : "";
   if (l.kind === "blur") {
     document.querySelectorAll("#ved-btype button").forEach(b => b.classList.toggle("on", b.dataset.btype === l.blurType));
     $("#ved-amount").value = l.amount;
@@ -243,8 +379,10 @@ function vedSyncControls() {
     $("#ved-text-input").value = l.text || "";
     $("#ved-font-size").value = l.fontSize || 32;
     $("#ved-fsize-val").textContent = l.fontSize || 32;
+    const fxVal = l.fx || (l.bg === "none" ? "shadow" : "none");
     document.querySelectorAll("#ved-font-grid button").forEach(b => b.classList.toggle("on", b.dataset.font === l.fontId));
     document.querySelectorAll("#ved-text-colors button").forEach(b => b.classList.toggle("on", b.dataset.color === l.color));
+    document.querySelectorAll("#ved-text-fx button").forEach(b => b.classList.toggle("on", b.dataset.fx === fxVal));
     document.querySelectorAll("#ved-text-bg button").forEach(b => b.classList.toggle("on", b.dataset.tbg === l.bg));
     document.querySelectorAll("#ved-text-align button").forEach(b => b.classList.toggle("on", b.dataset.align === (l.align || "center")));
   }
@@ -256,6 +394,11 @@ function vedRenderFontUI() {
   $("#ved-text-colors").innerHTML = VED_COLORS.map(c =>
     `<button type="button" class="ved-color-dot" data-color="${c}" style="background:${c}" aria-label="Color ${c}"></button>`
   ).join("");
+  if ($("#ved-cap-colors")) {
+    $("#ved-cap-colors").innerHTML = ["#facc15", "#e11d2e", "#42c98b", "#38bdf8", "#ffffff"].map(c =>
+      `<button type="button" class="ved-color-dot" data-ccolor="${c}" style="background:${c}" aria-label="Caption color ${c}"></button>`
+    ).join("");
+  }
 }
 function vedRenderOverlayList() {
   const saved = loadSavedOverlays();
@@ -267,10 +410,23 @@ function vedRenderOverlayList() {
   $("#ved-ov-count").textContent = `${saved.length}/${MAX_SAVED_OVERLAYS} saved`;
   $("#ved-import").disabled = saved.length >= MAX_SAVED_OVERLAYS;
 }
+function cloneBgm(bgm) {
+  return bgm?.blob ? { name: bgm.name || "Audio track", volume: bgm.volume ?? 0.15, blob: bgm.blob } : null;
+}
 function vedSaveLayersToState() {
   const clean = cloneLayers(ved.layers);
+  const sq = !!ved.frame?.square1x1;
+  if (state.lastFrame) state.lastFrame.square1x1 = sq;
   if (ved.scope === "individual") {
-    if (state.outputs[ved.index]) state.outputs[ved.index].vLayers = clean;
+    const out = state.outputs[ved.index];
+    if (out) {
+      out.vLayers = clean;
+      out.vFrame = clone(ved.frame || out.vFrame || state.lastFrame || defaultFrame());
+      out.vFrame.square1x1 = sq;
+      out.vSilence = ved.silence ? clone(ved.silence) : null;
+      out.vBgm = cloneBgm(ved.bgm);
+      out.vCaptions = ved.captions ? clone(ved.captions) : null;
+    }
     return;
   }
   const sharedNonText = clean.filter(l => l.kind !== "text");
@@ -280,6 +436,13 @@ function vedSaveLayersToState() {
       ? curText
       : cloneLayers((out.vLayers || []).filter(l => l.kind === "text"));
     out.vLayers = [...cloneLayers(sharedNonText), ...existingText];
+    if (idx === ved.index && ved.frame) out.vFrame = clone(ved.frame);
+    else {
+      out.vFrame = clone(out.vFrame || ved.frame || state.lastFrame || defaultFrame());
+      out.vFrame.square1x1 = sq;
+    }
+    if (idx === ved.index) { out.vSilence = ved.silence ? clone(ved.silence) : null; out.vCaptions = ved.captions ? clone(ved.captions) : null; }
+    out.vBgm = cloneBgm(ved.bgm);
   });
 }
 function vedAddBlur() {
@@ -297,6 +460,10 @@ function vedAddText() {
     fontSize: 32,
     color: "#ffffff",
     bg: "none",
+    fx: "shadow",
+    opacity: 1,
+    startTime: 0,
+    endTime: null,
     align: "center",
     x: 0.15,
     y: 0.44,
@@ -332,6 +499,13 @@ async function loadVedClip(i) {
   await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("preview")); });
   ved.index = i;
   ved.guides = null;
+  const baseFrame = item.vFrame || state.lastFrame || defaultFrame();
+  ved.frame = clone(baseFrame);
+  ved.silence = item.vSilence ? clone(item.vSilence) : null;
+  ved.silSens = ved.silence?.sensitivity || "normal";
+  ved.bgm = item.vBgm ? { ...item.vBgm } : null;
+  ved.captions = item.vCaptions ? clone(item.vCaptions) : null;
+  if ($("#ved-face-status")) $("#ved-face-status").textContent = "";
   ved.layers = await preloadLayerImages(cloneLayers(item.vLayers));
   ved.sel = ved.layers.length ? 0 : -1;
   const slider = $("#ved-time");
@@ -375,6 +549,7 @@ async function openVerticalEditor(i, opts = {}) {
 }
 function closeVerticalEditor(reopenFraming = false) {
   previewStop();
+  if (ved.bgmAudio) { try { ved.bgmAudio.pause(); } catch {} }
   $("#veditor").hidden = true;
   ved.drag = null;
   ved.guides = null;
@@ -538,6 +713,71 @@ $("#ved-text-bg").addEventListener("click", e => {
   vedSyncControls();
   drawVEditor();
 });
+$("#ved-aspect")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-aspect]");
+  if (!b || !ved.frame) return;
+  ved.frame.square1x1 = b.dataset.aspect === "square";
+  vedSyncControls();
+  drawVEditor();
+});
+$("#ved-text-fx")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-fx]");
+  const l = ved.layers[ved.sel];
+  if (!b || !l || l.kind !== "text") return;
+  l.fx = b.dataset.fx;
+  vedSyncControls();
+  drawVEditor();
+});
+$("#ved-text-presets")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-tpreset]");
+  const l = ved.layers[ved.sel];
+  if (!b || !l || l.kind !== "text") return;
+  const p = b.dataset.tpreset;
+  if (p === "hook") {
+    Object.assign(l, { fontId: "headline", fontSize: 42, color: "#e11d2e", bg: "none", fx: "glow", opacity: 1, startTime: 0, endTime: 3, align: "center" });
+  } else if (p === "caption") {
+    Object.assign(l, { fontId: "headline", fontSize: 36, color: "#facc15", bg: "none", fx: "outline", opacity: 1, startTime: 0, endTime: null, align: "center" });
+  } else if (p === "watermark") {
+    Object.assign(l, { fontId: "classic_medium", fontSize: 18, color: "#ffffff", bg: "none", fx: "shadow", opacity: 0.55, startTime: 0, endTime: null, align: "center" });
+  }
+  vedSyncControls();
+  drawVEditor();
+});
+$("#ved-opacity")?.addEventListener("input", e => {
+  const l = ved.layers[ved.sel];
+  if (!l) return;
+  const pct = clamp(Number(e.target.value) || 100, 5, 100);
+  l.opacity = pct / 100;
+  if ($("#ved-opacity-val")) $("#ved-opacity-val").textContent = pct;
+  drawVEditor();
+});
+$("#ved-t-start")?.addEventListener("input", e => {
+  const l = ved.layers[ved.sel];
+  if (!l) return;
+  l.startTime = Math.max(0, Number(e.target.value) || 0);
+  drawVEditor();
+});
+$("#ved-t-end")?.addEventListener("input", e => {
+  const l = ved.layers[ved.sel];
+  if (!l) return;
+  const val = e.target.value.trim();
+  l.endTime = (val !== "" && Number(val) > 0) ? Number(val) : null;
+  drawVEditor();
+});
+$("#ved-t-hook")?.addEventListener("click", () => {
+  const l = ved.layers[ved.sel];
+  if (!l) return;
+  l.startTime = 0; l.endTime = 3;
+  vedSyncControls();
+  drawVEditor();
+});
+$("#ved-t-full")?.addEventListener("click", () => {
+  const l = ved.layers[ved.sel];
+  if (!l) return;
+  l.startTime = 0; l.endTime = null;
+  vedSyncControls();
+  drawVEditor();
+});
 $("#ved-text-align")?.addEventListener("click", e => {
   const b = e.target.closest("button[data-align]");
   const l = ved.layers[ved.sel];
@@ -594,3 +834,347 @@ $("#ved-save").addEventListener("click", () => {
     : `Saved edits to clip ${ved.index + 1}. Click Move Back to export.`);
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#veditor").hidden) closeVerticalEditor(true); });
+
+/* ---- Phase 2: Auto-face centering, Silence cutting, Background music ---- */
+const SILENCE_SENS = {
+  gentle: { db: -38, minGap: 0.6 },
+  normal: { db: -32, minGap: 0.45 },
+  tight:  { db: -26, minGap: 0.3 },
+};
+async function vedScanSilences(blob, sensKey = "normal") {
+  const cfg = SILENCE_SENS[sensKey] || SILENCE_SENS.normal;
+  const thresh = Math.pow(10, cfg.db / 20);
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) throw new Error("Audio analysis is not supported in this browser.");
+  const ac = new AC();
+  let buf;
+  try { buf = await ac.decodeAudioData(await blob.arrayBuffer()); }
+  finally { try { await ac.close(); } catch {} }
+  const sr = buf.sampleRate, len = buf.length, chs = buf.numberOfChannels;
+  const win = Math.max(1, Math.round(sr * 0.02));
+  const nWin = Math.floor(len / win);
+  const active = new Uint8Array(nWin);
+  const chData = Array.from({ length: chs }, (_, c) => buf.getChannelData(c));
+  for (let w = 0; w < nWin; w++) {
+    let sum = 0;
+    const base = w * win;
+    for (let i = 0; i < win; i++) {
+      let s = 0;
+      for (let c = 0; c < chs; c++) s += chData[c][base + i];
+      s /= chs;
+      sum += s * s;
+    }
+    if (Math.sqrt(sum / win) >= thresh) active[w] = 1;
+  }
+  const padWin = Math.round(0.12 / 0.02);
+  const padded = new Uint8Array(nWin);
+  for (let w = 0; w < nWin; w++) {
+    if (!active[w]) continue;
+    for (let k = Math.max(0, w - padWin); k <= Math.min(nWin - 1, w + padWin); k++) padded[k] = 1;
+  }
+  const minGapWin = Math.round(cfg.minGap / 0.02);
+  let i = 0;
+  while (i < nWin) {
+    if (padded[i]) { i++; continue; }
+    let j = i;
+    while (j < nWin && !padded[j]) j++;
+    if (i > 0 && j < nWin && (j - i) < minGapWin) {
+      for (let k = i; k < j; k++) padded[k] = 1;
+    }
+    i = j;
+  }
+  const segments = [];
+  i = 0;
+  while (i < nWin) {
+    if (!padded[i]) { i++; continue; }
+    let j = i;
+    while (j < nWin && padded[j]) j++;
+    const s = i * 0.02, e = Math.min(buf.duration, j * 0.02);
+    if (e - s >= 0.15) segments.push({ start: s, end: e });
+    i = j;
+  }
+  if (!segments.length) return { enabled: false, sensitivity: sensKey, segments: [], savedSec: 0, pauseCount: 0, totalDur: buf.duration };
+  const kept = segments.reduce((acc, g) => acc + (g.end - g.start), 0);
+  const savedSec = Math.max(0, buf.duration - kept);
+  const pauseCount = Math.max(0, segments.length - 1) + (segments[0].start > 0.25 ? 1 : 0) + (buf.duration - segments[segments.length - 1].end > 0.25 ? 1 : 0);
+  return { enabled: savedSec >= 0.2, sensitivity: sensKey, segments, savedSec, pauseCount, totalDur: buf.duration };
+}
+
+async function getVedFaceLandmarker() {
+  if (ved.faceLandmarker) return ved.faceLandmarker;
+  const mod = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm");
+  const { FaceLandmarker, FilesetResolver } = mod;
+  const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  ved.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+      delegate: "GPU",
+    },
+    runningMode: "IMAGE",
+    numFaces: 4,
+  });
+  return ved.faceLandmarker;
+}
+
+async function vedAutoCenterFaces() {
+  const v = ved.video;
+  if (!v || !v.videoWidth || !ved.frame) return;
+  const st = $("#ved-face-status");
+  if (st) st.textContent = "Scanning...";
+  try {
+    const fl = await getVedFaceLandmarker();
+    const cv = document.createElement("canvas");
+    const scale = Math.min(1, 640 / v.videoWidth);
+    cv.width = Math.round(v.videoWidth * scale);
+    cv.height = Math.round(v.videoHeight * scale);
+    cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
+    const res = fl.detect(cv);
+    const faces = (res?.faceLandmarks || []).map(lm => {
+      let minX = 1, maxX = 0, minY = 1, maxY = 0;
+      for (const p of lm) {
+        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+      }
+      return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+    });
+    if (!faces.length) {
+      if (st) st.textContent = "No face found";
+      toast("No face detected at this timestamp.", true);
+      return;
+    }
+    const boxes = getFrameBoxes(ved.frame);
+    let moved = 0;
+    boxes.forEach(box => {
+      const bx = box.x + box.w / 2, by = box.y + box.h / 2;
+      let best = faces[0], bestD = Infinity;
+      for (const f of faces) {
+        const d = Math.hypot(f.cx - bx, f.cy - by);
+        if (d < bestD) { bestD = d; best = f; }
+      }
+      if (best) {
+        box.x = clamp(best.cx - box.w / 2, 0, 1 - box.w);
+        box.y = clamp(best.cy - box.h * 0.38, 0, 1 - box.h);
+        moved++;
+      }
+    });
+    if (st) st.textContent = `Centered ${moved} box${moved === 1 ? "" : "es"}`;
+    drawVEditor();
+    toast("Centered framing on speaker face.");
+  } catch (err) {
+    console.warn("Auto-center face failed:", err);
+    if (st) st.textContent = "Unavailable";
+    toast("Face detector unavailable offline.", true);
+  }
+}
+
+$("#ved-face-center")?.addEventListener("click", vedAutoCenterFaces);
+$("#ved-sil-sens")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-sens]");
+  if (!b) return;
+  ved.silSens = b.dataset.sens;
+  vedSyncControls();
+});
+$("#ved-sil-scan")?.addEventListener("click", async () => {
+  const item = state.outputs[ved.index];
+  if (!item?.blob) return;
+  const btn = $("#ved-sil-scan");
+  btn.disabled = true;
+  if ($("#ved-sil-status")) $("#ved-sil-status").textContent = "Scanning...";
+  try {
+    const res = await vedScanSilences(item.blob, ved.silSens || "normal");
+    ved.silence = res.enabled ? res : null;
+    vedSyncControls();
+    toast(res.enabled
+      ? `Found ${res.pauseCount} pause${res.pauseCount === 1 ? "" : "s"} (${res.savedSec.toFixed(1)}s will be trimmed on export).`
+      : "No long pauses found.");
+  } catch (err) {
+    toast(err.message || "Could not scan audio.", true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+$("#ved-sil-reset")?.addEventListener("click", () => {
+  ved.silence = null;
+  vedSyncControls();
+  toast("Silence trim cleared.");
+});
+$("#ved-bgm-pick")?.addEventListener("click", () => $("#ved-bgm-file")?.click());
+$("#ved-bgm-file")?.addEventListener("change", e => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (!file) return;
+  ved.bgm = { name: file.name, volume: ved.bgm?.volume ?? 0.15, blob: file };
+  vedSyncControls();
+  toast("Background music added.");
+});
+$("#ved-bgm-clear")?.addEventListener("click", () => {
+  ved.bgm = null;
+  vedSyncControls();
+  toast("Background music removed.");
+});
+$("#ved-bgm-vol")?.addEventListener("input", e => {
+  if (!ved.bgm) return;
+  const pct = clamp(Number(e.target.value) || 15, 2, 60);
+  ved.bgm.volume = pct / 100;
+  if ($("#ved-bgm-vol-val")) $("#ved-bgm-vol-val").textContent = pct;
+});
+
+/* ---- Phase 3: In-browser Auto-Captions (Whisper via Transformers.js) ---- */
+async function vedExtract16kMono(blob, silenceCfg) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) throw new Error("Web Audio is not supported in this browser.");
+  const ac = new AC();
+  let buf;
+  try { buf = await ac.decodeAudioData(await blob.arrayBuffer()); }
+  finally { try { await ac.close(); } catch {} }
+  const segs = (silenceCfg?.enabled && silenceCfg.segments?.length) ? silenceCfg.segments : [{ start: 0, end: buf.duration }];
+  const totalDur = Math.max(0.1, segs.reduce((a, g) => a + Math.max(0, g.end - g.start), 0));
+  const off = new OfflineAudioContext(1, Math.ceil(totalDur * 16000), 16000);
+  let cursor = 0;
+  for (const g of segs) {
+    const dur = Math.max(0, g.end - g.start);
+    if (dur <= 0) continue;
+    const src = off.createBufferSource();
+    src.buffer = buf;
+    src.connect(off.destination);
+    src.start(cursor, g.start, dur);
+    cursor += dur;
+  }
+  const rendered = await off.startRendering();
+  return rendered.getChannelData(0);
+}
+
+function vedNormalizeWhisperWords(result, totalDur) {
+  const out = [];
+  const chunks = Array.isArray(result?.chunks) ? result.chunks : [];
+  for (const ch of chunks) {
+    const raw = String(ch.text || "").trim();
+    if (!raw) continue;
+    const t0 = Number(ch.timestamp?.[0]) || 0;
+    const t1 = Number(ch.timestamp?.[1]);
+    const end = (Number.isFinite(t1) && t1 > t0) ? t1 : Math.min(totalDur, t0 + Math.max(0.25, raw.length * 0.06));
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (parts.length <= 1) {
+      out.push({ word: raw, start: t0, end });
+    } else {
+      const totalChars = Math.max(1, parts.reduce((a, p) => a + p.length, 0));
+      let cur = t0;
+      const span = Math.max(0.1, end - t0);
+      for (const p of parts) {
+        const wDur = span * (p.length / totalChars);
+        out.push({ word: p, start: cur, end: cur + wDur });
+        cur += wDur;
+      }
+    }
+  }
+  if (!out.length && result?.text) {
+    const parts = String(result.text).trim().split(/\s+/).filter(Boolean);
+    const step = totalDur / Math.max(1, parts.length);
+    parts.forEach((p, idx) => out.push({ word: p, start: idx * step, end: (idx + 1) * step }));
+  }
+  return out;
+}
+
+async function vedGenerateCaptions() {
+  const item = state.outputs[ved.index];
+  if (!item?.blob) return;
+  const btn = $("#ved-cap-gen"), st = $("#ved-cap-status");
+  btn.disabled = true;
+  if (st) st.textContent = "Preparing audio...";
+  try {
+    const audio16k = await vedExtract16kMono(item.blob, ved.silence);
+    const modelId = ved.capModel === "base" ? "onnx-community/whisper-base" : "onnx-community/whisper-tiny";
+    if (!ved.transcribers[modelId]) {
+      if (st) st.textContent = "Downloading AI model (1st time)...";
+      const { pipeline, env } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0/+esm");
+      env.allowLocalModels = false;
+      const device = navigator.gpu ? "webgpu" : "wasm";
+      ved.transcribers[modelId] = await pipeline("automatic-speech-recognition", modelId, {
+        device,
+        dtype: device === "webgpu" ? "fp32" : "q8",
+      });
+    }
+    if (st) st.textContent = "Transcribing...";
+    const transcriber = ved.transcribers[modelId];
+    const result = await transcriber(audio16k, { return_timestamps: "word", chunk_length_s: 30, stride_length_s: 5 });
+    const words = vedNormalizeWhisperWords(result, audio16k.length / 16000);
+    if (!words.length) {
+      if (st) st.textContent = "No speech found";
+      toast("No speech detected in this clip.", true);
+      return;
+    }
+    ved.captions = {
+      enabled: true,
+      style: ved.captions?.style || "highlight",
+      color: ved.captions?.color || "#facc15",
+      fontSize: ved.captions?.fontSize || 40,
+      y: ved.captions?.y || 0.72,
+      words,
+    };
+    vedSyncControls();
+    drawVEditor();
+    toast(`Generated ${words.length} timed words.`);
+  } catch (err) {
+    console.warn("Auto-captions failed:", err);
+    if (st) st.textContent = "Failed";
+    toast("Could not generate captions. Check connection for 1st-time model download.", true);
+  } finally {
+    btn.disabled = false;
+    vedSyncControls();
+  }
+}
+
+$("#ved-cap-model")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-cmodel]");
+  if (!b) return;
+  ved.capModel = b.dataset.cmodel;
+  vedSyncControls();
+});
+$("#ved-cap-gen")?.addEventListener("click", vedGenerateCaptions);
+$("#ved-cap-clear")?.addEventListener("click", () => {
+  ved.captions = null;
+  vedSyncControls();
+  drawVEditor();
+  toast("Captions removed.");
+});
+$("#ved-cap-style")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-cstyle]");
+  if (!b || !ved.captions) return;
+  ved.captions.style = b.dataset.cstyle;
+  vedSyncControls();
+  drawVEditor();
+});
+$("#ved-cap-colors")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-ccolor]");
+  if (!b || !ved.captions) return;
+  ved.captions.color = b.dataset.ccolor;
+  vedSyncControls();
+  drawVEditor();
+});
+$("#ved-cap-size")?.addEventListener("input", e => {
+  if (!ved.captions) return;
+  ved.captions.fontSize = Number(e.target.value) || 40;
+  if ($("#ved-cap-size-val")) $("#ved-cap-size-val").textContent = ved.captions.fontSize;
+  drawVEditor();
+});
+$("#ved-cap-y")?.addEventListener("input", e => {
+  if (!ved.captions) return;
+  const pct = clamp(Number(e.target.value) || 72, 15, 90);
+  ved.captions.y = pct / 100;
+  if ($("#ved-cap-y-val")) $("#ved-cap-y-val").textContent = pct;
+  drawVEditor();
+});
+$("#ved-cap-text")?.addEventListener("input", e => {
+  if (!ved.captions?.words?.length) return;
+  const edited = e.target.value.trim().split(/\s+/).filter(Boolean);
+  if (!edited.length) return;
+  const old = ved.captions.words;
+  const totalEnd = old[old.length - 1].end;
+  const totalStart = old[0].start;
+  ved.captions.words = edited.map((word, idx) => {
+    if (idx < old.length) return { word, start: old[idx].start, end: old[idx].end };
+    const step = (totalEnd - totalStart) / edited.length;
+    return { word, start: totalStart + idx * step, end: totalStart + (idx + 1) * step };
+  });
+  drawVEditor();
+});

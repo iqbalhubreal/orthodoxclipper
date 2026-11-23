@@ -105,3 +105,9 @@
 }
 
 .ed-play-row{display:flex;gap:8px;margin-top:6px}
+
+.ved-presets-row .btn{min-height:30px}
+.ved-timing-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end}
+.ved-timing-btns{display:flex;gap:4px}
+.ved-timing-btns .btn{min-height:31px}
+.ved-face-row{display:flex;align-items:center;justify-content:space-between;gap:8px}

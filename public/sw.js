@@ -3,7 +3,7 @@
    - Other own static files (icons, vendor/ffmpeg wrappers): stale-while-revalidate.
    - The ~31 MB ffmpeg core, mediabunny, and Three.js from the CDN: cached after the first download, so later cutting works offline.
    - Never touches /api/*, /__native_clip__/*, .zip downloads, non-GET requests, or anything else cross-origin (YouTube, etc). */
-const VERSION = "clipper-v1.28.0";
+const VERSION = "clipper-v1.31.0";
 const SHELL = `${VERSION}-shell`;
 const CORE = "clipper-ffmpeg-core-0.12.6"; // not tied to the app version: the engine rarely changes
 const PRECACHE = [
@@ -24,7 +24,9 @@ self.addEventListener("activate", event => {
 
 const isCore = url => (/^(cdn\.jsdelivr\.net|unpkg\.com)$/.test(url.hostname) && (url.pathname.includes("/@ffmpeg/core@0.12.6/") || url.pathname.includes("/mediabunny@1") || url.pathname.includes("/@mediapipe/tasks-vision@0.10.14/")))
   || (url.hostname === "storage.googleapis.com" && url.pathname.includes("/mediapipe-models/face_landmarker/"))
-  || (url.hostname === "cdnjs.cloudflare.com" && url.pathname.includes("/three.js/r128/"));
+  || (url.hostname === "cdnjs.cloudflare.com" && url.pathname.includes("/three.js/r128/"))
+  || (url.hostname === "cdn.jsdelivr.net" && url.pathname.includes("@huggingface/transformers"))
+  || url.hostname.endsWith("huggingface.co");
 
 self.addEventListener("fetch", event => {
   const req = event.request, url = new URL(req.url);
