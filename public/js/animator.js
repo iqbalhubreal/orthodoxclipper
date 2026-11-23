@@ -2,7 +2,7 @@
 /* 3D Phone Mockup Animator (Three.js r128): wraps the composed 1080x1920 vertical video inside a 3D phone zoom-out/table/zoom-in animation.
    Uses a single shared WebGLRenderer with preserveDrawingBuffer: true so Android WebView neither hits context limits nor drops frames on drawImage(). */
 const ANIM_SW = 720, ANIM_SH = 1536, ANIM_VY = 128, ANIM_VH = 1280;
-const ANIM_ZO = 1.4, ANIM_REST = 2.0, ANIM_ZI = 1.2;
+const ANIM_ZO = 1.4, ANIM_REST = 3.5, ANIM_ZI = 1.2;
 const ANIM_CAM = { full: [90, 18.47, 0], rest: [90, 31, 0] };
 const ANIM_END = [90, 29.8, 0];
 
