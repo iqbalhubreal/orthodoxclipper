@@ -121,6 +121,12 @@ function edSyncUI() {
       if (document.activeElement !== inp) inp.value = curNames[idx] || "";
     });
   }
+  const animBtn = $("#ed-animator");
+  if (animBtn) {
+    const curItem = state.outputs[ed.index];
+    const animOn = !!(curItem?.vAnim?.enabled ?? (typeof loadClipperPrefs === "function" && loadClipperPrefs().anim?.enabled));
+    animBtn.textContent = animOn ? "Animator ✓" : "Animator";
+  }
 }
 function edCheckedIndices() {
   return [...document.querySelectorAll('#ed-clips input[type="checkbox"]:checked')].map(el => Number(el.value));
@@ -373,6 +379,15 @@ $("#ed-overlays").addEventListener("click", () => {
   $("#editor").hidden = true;
   document.body.style.overflow = "";
   openVerticalEditor(idx, { frame, returnToEditor: true });
+});
+$("#ed-animator").addEventListener("click", () => {
+  previewStop();
+  const frame = clone(ed.frame), idx = ed.index;
+  if (state.outputs[idx]) state.outputs[idx].vFrame = clone(frame);
+  edPersistFrame();
+  $("#editor").hidden = true;
+  document.body.style.overflow = "";
+  openAnimator(idx, { frame, returnToEditor: true });
 });
 $("#ed-clips").addEventListener("change", edSyncClipsBtn);
 $("#ed-pick-all").addEventListener("click", () => {

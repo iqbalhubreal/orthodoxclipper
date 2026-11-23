@@ -123,22 +123,3 @@
 .ved-prog-track{height:8px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
 .ved-prog-fill{height:100%;width:0%;background:var(--accent,#7764e8);border-radius:99px;transition:width .18s ease}
 .ved-prog-txt{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:6px}
-
-.ved-tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
-.ved-tpl-card{display:flex;align-items:center;gap:8px;padding:6px;border:1.5px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer;text-align:left;color:var(--ink)}
-.ved-tpl-card:hover{border-color:var(--accent)}
-.ved-tpl-card.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--ring)}
-.vt-phone{position:relative;flex:none;width:28px;aspect-ratio:9/16;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15)}
-.vt-box,.vt-card,.vt-pip,.vt-cap,.vt-wm,.vt-hook-lbl{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;font-size:5px;font-weight:800;line-height:1}
-.vt-card{left:7%;right:7%;background:#35516b;border:1px solid rgba(148,163,184,.45);border-radius:2px}
-.vt-pip{background:#6a4a68;border:1px solid #38bdf8;border-radius:2px}
-.vt-cap{transform:translateY(-50%);letter-spacing:.2px}
-.vt-wm{left:22%;right:22%;height:2px;transform:translateY(-50%);background:rgba(255,255,255,.35)}
-.vt-hook-lbl{left:14%;right:14%;height:6px;transform:translateY(-50%);background:#fff;color:#000;border-radius:2px;font-size:4.5px}
-.vt-meta{min-width:0;display:flex;flex-direction:column;gap:1px}
-.vt-meta b{font-size:11.5px;line-height:1.15;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vt-meta small{font-size:10px;color:var(--muted)}
-.ved-anim-adv{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
-.ved-anim-adv summary{cursor:pointer;font-size:12px;font-weight:650;color:var(--accent2);padding:2px 0}
-.ved-anim-adv-body{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-#ved-anim-toggle.on{background:#7764e8;color:#fff;border-color:transparent}

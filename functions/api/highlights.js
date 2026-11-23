@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function: POST /api/highlights
  * Accepts creator-supplied timestamp ranges and notes, then asks Gemini to
- * write one short, direct, debate-sparking caption (6-10 words), a punchy mute-friendly top-banner hook (max 7 words), #TheOrthodoxMuslim, three topic hashtags, @MuslimOrthodoxy, and @orthodoxmuslim for each range. Video stays local.
+ * write one short, direct, debate-sparking caption (6-10 words), a punchy 5-8 word mute-friendly top-banner hook, #TheOrthodoxMuslim, three topic hashtags, @MuslimOrthodoxy, and @orthodoxmuslim for each range. Video stays local.
  */
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
@@ -85,7 +85,7 @@ The creator supplied timestamp ranges and detailed notes for selected moments in
 For every supplied clip, return exactly one output in the same order. Preserve each start and end timestamp exactly. Do not add, remove, reorder, extend, shorten, or overlap any clip.
 
 For each clip:
-- Write "hook": a punchy on-screen headline (max 7 words) for the top of a vertical video so muted viewers immediately grasp the core debate or question.
+- Write "hook": a punchy 5 to 8 word on-screen headline for the top of a vertical video so muted viewers immediately grasp the core debate or question.
 - Write "caption": one sharp, punchy social caption of around 6 to 10 words that highlights the core tension, surprising claim, or pointed question in the creator's note, written to spark real discussion and debate in the comments.
 - Be bold and specific, not vague, soft, or overly generous.
 - Do not add generic engagement bait ("Comment below!", "Like and follow!") or unsupported factual claims beyond the note.
@@ -102,7 +102,7 @@ Return only JSON in this shape:
       "title": "short clip title",
       "start": "same as supplied",
       "end": "same as supplied",
-      "hook": "max 7 word on-screen debate hook",
+      "hook": "5 to 8 word on-screen debate hook",
       "caption": "6 to 10 word debate-sparking caption",
       "tags": ["${REQUIRED_TAG}", "topic-one", "topic-two", "topic-three", "${REQUIRED_MENTION_1}", "${REQUIRED_MENTION_2}"]
     }
@@ -157,8 +157,8 @@ function normalizeCaptions(data, clips) {
     const item = raw[index] || {};
     let caption = str(item.caption || item.hook, 220);
     if (!caption || BLOCKED_CAPTION.test(caption)) caption = fallbackCaption(clip.note);
-    let hook = limitWords(str(item.hook, 120), 7);
-    if (!hook || BLOCKED_CAPTION.test(hook)) hook = limitWords(fallbackCaption(clip.note), 7);
+    let hook = str(item.hook || item.caption, 140);
+    if (!hook || BLOCKED_CAPTION.test(hook)) hook = caption.slice(0, 140);
     const tags = normalizeTags(item.tags, clip.note);
     return {
       title: str(item.title, 100) || `Clip ${index + 1}`,
@@ -244,8 +244,4 @@ const round = value => Math.round(value * 10) / 10;
 const str = (value, max) => value == null ? "" : String(value).trim().slice(0, max);
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
-}
-
-function limitWords(text, max) {
-  return String(text || "").trim().split(/\s+/).filter(Boolean).slice(0, max).join(" ");
 }
