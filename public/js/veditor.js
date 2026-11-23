@@ -1,6 +1,6 @@
 "use strict";
 /* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text only in Individual mode). */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", silSens: "normal", silence: null, bgm: null, bgmAudio: null, faceLandmarker: null, capModel: "tiny", captions: null, transcribers: {}, brolls: [], stitch: null };
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", silSens: "normal", silence: null, bgm: null, bgmAudio: null, faceLandmarker: null, capModel: "tiny", captions: null, transcribers: {}, brolls: [], stitch: null, activeTemplate: null, anim: null };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -23,8 +23,11 @@ function cloneLayers(layers) {
       endTime: (l.endTime !== "" && l.endTime != null && Number(l.endTime) > 0) ? Number(l.endTime) : null,
     };
     if (l.kind === "blur") { copy.blurType = l.blurType; copy.amount = l.amount; }
-    else if (l.kind === "text") { copy.text = l.text; copy.fontId = l.fontId; copy.fontSize = l.fontSize; copy.color = l.color; copy.bg = l.bg; copy.fx = l.fx || (l.bg === "none" ? "shadow" : "none"); copy.align = l.align || "center"; }
+    else if (l.kind === "text") { copy.text = l.text; copy.fontId = l.fontId; copy.fontSize = l.fontSize; copy.color = l.color; copy.bg = l.bg; copy.fx = l.fx || (l.bg === "none" ? "shadow" : "none"); copy.align = l.align || "center"; if (l.glowColor) copy.glowColor = l.glowColor; if (l.rule) copy.rule = true; if (l.caps) copy.caps = true; }
     else { copy.name = l.name; copy.url = l.url; copy.aspect = l.aspect; }
+    if (l.tpl) copy.tpl = l.tpl;
+    if (l.tplRole) copy.tplRole = l.tplRole;
+    if (l.shared) copy.shared = true;
     return copy;
   });
 }
@@ -102,7 +105,8 @@ function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
   ctx.textBaseline = "middle";
   const padX = Math.round(14 * s);
   const maxW = Math.max(20, rw - padX * 2);
-  const words = String(l.text || "").split(/\n/);
+  const rawText = l.caps ? String(l.text || "").toUpperCase() : String(l.text || "");
+  const words = rawText.split(/\n/);
   const lines = [];
   for (const para of words) {
     let cur = "";
@@ -143,7 +147,7 @@ function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
     lines.forEach((line, idx) => ctx.strokeText(line, tx, startY + idx * lineH));
     ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   } else if (fx === "glow") {
-    ctx.shadowColor = l.color || "#ffffff";
+    ctx.shadowColor = l.glowColor || l.color || "#ffffff";
     ctx.shadowBlur = Math.round(18 * s);
     ctx.shadowOffsetY = 0;
     ctx.fillStyle = l.color || "#ffffff";
@@ -155,6 +159,17 @@ function drawTextLayer(ctx, l, rx, ry, rw, rh, s) {
     ctx.shadowOffsetY = Math.round(2.5 * s);
   }
   ctx.fillStyle = l.color || "#ffffff";
+  if (l.rule && lines.length) {
+    const maxLineW = Math.max(...lines.map(ln => ctx.measureText(ln).width));
+    const ruleW = Math.min(rw - padX, Math.max(40 * s, maxLineW + 16 * s));
+    const ruleX = Math.round(rx + (rw - ruleW) / 2);
+    const ruleY = Math.round(startY - lineH * 0.62);
+    ctx.save();
+    ctx.shadowColor = "transparent";
+    ctx.globalAlpha *= 0.7;
+    ctx.fillRect(ruleX, ruleY, Math.round(ruleW), Math.max(1, Math.round(1.5 * s)));
+    ctx.restore();
+  }
   lines.forEach((line, idx) => ctx.fillText(line, tx, startY + idx * lineH));
   ctx.restore();
 }
@@ -202,6 +217,7 @@ function drawCaptions(ctx, W, H, capCfg, timeSec) {
   if (activeIdx < 0) return;
   const s = W / 540;
   const style = capCfg.style || "highlight";
+  const useCaps = capCfg.caps === true || (capCfg.caps !== false && (style === "highlight" || style === "word"));
   const hlColor = capCfg.color || "#facc15";
   const pxSize = Math.max(14, Math.round((capCfg.fontSize || 40) * s));
   const cy = Math.round(clamp(Number(capCfg.y) || 0.72, 0.1, 0.92) * H);
@@ -217,11 +233,13 @@ function drawCaptions(ctx, W, H, capCfg, timeSec) {
   ctx.shadowOffsetY = Math.round(2 * s);
 
   if (style === "word") {
-    const txt = String(words[activeIdx].word || "").toUpperCase();
+    const wObj = words[activeIdx];
+    const raw = String(wObj.word || "");
+    const txt = useCaps ? raw.toUpperCase() : raw;
     ctx.textAlign = "center";
     ctx.strokeText(txt, W / 2, cy);
     ctx.shadowColor = "transparent";
-    ctx.fillStyle = hlColor;
+    ctx.fillStyle = wObj.color || hlColor;
     ctx.fillText(txt, W / 2, cy);
     ctx.restore();
     return;
@@ -230,7 +248,10 @@ function drawCaptions(ctx, W, H, capCfg, timeSec) {
   const groupSize = 3;
   const gStart = Math.floor(activeIdx / groupSize) * groupSize;
   const group = words.slice(gStart, Math.min(words.length, gStart + groupSize));
-  const labels = group.map(w => style === "highlight" ? String(w.word || "").toUpperCase() : String(w.word || ""));
+  const labels = group.map(w => {
+    const raw = String(w.word || "");
+    return useCaps ? raw.toUpperCase() : raw;
+  });
   const spaceW = ctx.measureText(" ").width;
   const widths = labels.map(txt => ctx.measureText(txt).width);
   const totalW = widths.reduce((a, b) => a + b, 0) + spaceW * Math.max(0, labels.length - 1);
@@ -242,7 +263,7 @@ function drawCaptions(ctx, W, H, capCfg, timeSec) {
     ctx.strokeText(txt, x, cy);
     ctx.save();
     ctx.shadowColor = "transparent";
-    ctx.fillStyle = (style === "highlight" && isCur) ? hlColor : "#ffffff";
+    ctx.fillStyle = w.color || ((style === "highlight" && isCur) ? hlColor : "#ffffff");
     ctx.fillText(txt, x, cy);
     ctx.restore();
     x += widths[idx] + spaceW;
@@ -344,6 +365,17 @@ function vedSyncControls() {
   document.querySelectorAll("#ved-aspect button").forEach(b => b.classList.toggle("on", (b.dataset.aspect === "square") === sqOn));
   vedSyncClipBar();
   vedRefreshAiPackStatus();
+  if (typeof renderTemplatePicker === "function") renderTemplatePicker();
+  if ($("#ved-wm-text") && document.activeElement !== $("#ved-wm-text")) {
+    const _prefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { watermark: "@yourchannel" };
+    $("#ved-wm-text").value = _prefs.watermark || "@yourchannel";
+  }
+  const stageOn = !!ved.frame?.stage?.enabled;
+  if ($("#ved-stage-bg-wrap")) $("#ved-stage-bg-wrap").hidden = !stageOn;
+  if (stageOn) {
+    document.querySelectorAll("#ved-stage-bg button").forEach(b => b.classList.toggle("on", b.dataset.bg === (ved.frame.stage.bg || "midnight")));
+  }
+  vedSyncAnimUI();
   document.querySelectorAll("#ved-sil-sens button").forEach(b => b.classList.toggle("on", b.dataset.sens === (ved.silSens || "normal")));
   if ($("#ved-sil-status")) {
     $("#ved-sil-status").textContent = ved.silence?.enabled
@@ -365,7 +397,9 @@ function vedSyncControls() {
   if ($("#ved-cap-clear")) $("#ved-cap-clear").hidden = !hasCap;
   if ($("#ved-cap-opts")) $("#ved-cap-opts").hidden = !hasCap;
   if (hasCap) {
-    document.querySelectorAll("#ved-cap-style button").forEach(b => b.classList.toggle("on", b.dataset.cstyle === (ved.captions.style || "highlight")));
+    const normStyle = ved.captions.style === "clean" ? "plain" : (ved.captions.style || "highlight");
+    document.querySelectorAll("#ved-cap-style button").forEach(b => b.classList.toggle("on", b.dataset.cstyle === normStyle));
+    if ($("#ved-cap-caps")) $("#ved-cap-caps").checked = ved.captions.caps !== false;
     document.querySelectorAll("#ved-cap-colors button").forEach(b => b.classList.toggle("on", b.dataset.ccolor === (ved.captions.color || "#facc15")));
     const cSz = ved.captions.fontSize || 40;
     if ($("#ved-cap-size")) $("#ved-cap-size").value = cSz;
@@ -374,7 +408,7 @@ function vedSyncControls() {
     if ($("#ved-cap-y")) $("#ved-cap-y").value = cY;
     if ($("#ved-cap-y-val")) $("#ved-cap-y-val").textContent = cY;
     if ($("#ved-cap-text") && document.activeElement !== $("#ved-cap-text")) {
-      $("#ved-cap-text").value = ved.captions.words.map(w => w.word).join(" ");
+      $("#ved-cap-text").value = vedFormatCapWords(ved.captions.words);
     }
   }
 
@@ -434,6 +468,21 @@ function vedRenderFontUI() {
       `<button type="button" class="ved-color-dot" data-ccolor="${c}" style="background:${c}" aria-label="Caption color ${c}"></button>`
     ).join("");
   }
+  if ($("#ved-stage-bg") && typeof STAGE_BG_PRESETS !== "undefined") {
+    $("#ved-stage-bg").innerHTML = STAGE_BG_PRESETS.map(p =>
+      `<button type="button" class="stage-bg-dot" data-bg="${p.id}" title="${escapeHTML(p.name)}" style="background:linear-gradient(135deg,${p.c1},${p.c2});box-shadow:inset 0 0 0 2px ${p.accent}55"></button>`
+    ).join("");
+  }
+  if ($("#ved-anim-sw") && typeof ANIM_SWATCHES !== "undefined" && !$("#ved-anim-sw").childElementCount) {
+    $("#ved-anim-sw").innerHTML = ANIM_SWATCHES.map(s =>
+      `<button type="button" title="${s.name}" aria-label="${s.name}" data-c="${s.color}" data-ti="${s.ti ? 1 : 0}" class="ved-color-dot" style="background:#${s.color.toString(16).padStart(6, "0")}"></button>`
+    ).join("");
+  }
+  if ($("#ved-anim-stk-presets") && typeof ANIM_STICKERS !== "undefined" && !$("#ved-anim-stk-presets").childElementCount) {
+    $("#ved-anim-stk-presets").innerHTML = Object.entries(ANIM_STICKERS).map(([k, v]) =>
+      `<button type="button" data-stk="${k}">${v.name}</button>`
+    ).join("");
+  }
 }
 function vedRenderOverlayList() {
   const saved = loadSavedOverlays();
@@ -472,13 +521,13 @@ function vedSaveLayersToState() {
     }
     return;
   }
-  const sharedNonText = clean.filter(l => l.kind !== "text");
-  const curText = clean.filter(l => l.kind === "text");
+  const sharedLayers = clean.filter(l => l.kind !== "text" || l.shared);
+  const curPerClipText = clean.filter(l => l.kind === "text" && !l.shared);
   state.outputs.forEach((out, idx) => {
     const existingText = idx === ved.index
-      ? curText
-      : cloneLayers((out.vLayers || []).filter(l => l.kind === "text"));
-    out.vLayers = [...cloneLayers(sharedNonText), ...existingText];
+      ? curPerClipText
+      : cloneLayers((out.vLayers || []).filter(l => l.kind === "text" && !l.shared));
+    out.vLayers = [...cloneLayers(sharedLayers), ...existingText];
     if (idx === ved.index && ved.frame) out.vFrame = clone(ved.frame);
     else {
       out.vFrame = clone(out.vFrame || ved.frame || state.lastFrame || defaultFrame());
@@ -550,6 +599,10 @@ async function loadVedClip(i) {
   ved.captions = item.vCaptions ? clone(item.vCaptions) : null;
   ved.brolls = cloneBrolls(item.vBrolls);
   ved.stitch = cloneStitch(item.vStitch);
+  const _animPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs().anim : { enabled: false };
+  ved.anim = clone(item.vAnim || _animPrefs);
+  const tplLayer = (item.vLayers || []).find(l => l.tpl && String(l.tpl).startsWith("tpl:"));
+  ved.activeTemplate = tplLayer ? String(tplLayer.tpl).slice(4) : null;
   if ($("#ved-face-status")) $("#ved-face-status").textContent = "";
   ved.layers = await preloadLayerImages(cloneLayers(item.vLayers));
   ved.sel = ved.layers.length ? 0 : -1;
@@ -1260,7 +1313,17 @@ async function vedGenerateCaptions() {
     if (st) st.textContent = "Transcribing...";
     const transcriber = ved.transcribers[modelId];
     const result = await transcriber(audio16k, { return_timestamps: "word", chunk_length_s: 30, stride_length_s: 5 });
-    const words = vedNormalizeWhisperWords(result, audio16k.length / 16000);
+    const firstDur = audio16k.length / 16000;
+    const words = vedNormalizeWhisperWords(result, firstDur);
+    if (ved.stitch?.blob) {
+      try {
+        if (st) st.textContent = "Transcribing stitched clip...";
+        const st16k = await vedExtract16kMono(ved.stitch.blob, null);
+        const stRes = await transcriber(st16k, { return_timestamps: "word", chunk_length_s: 30, stride_length_s: 5 });
+        const stWords = vedNormalizeWhisperWords(stRes, st16k.length / 16000);
+        stWords.forEach(w => words.push({ ...w, start: w.start + firstDur, end: w.end + firstDur }));
+      } catch (e) { console.warn("Stitched clip transcription skipped:", e); }
+    }
     if (!words.length) {
       if (st) st.textContent = "No speech found";
       toast("No speech detected in this clip.", true);
@@ -1269,6 +1332,7 @@ async function vedGenerateCaptions() {
     ved.captions = {
       enabled: true,
       style: ved.captions?.style || "highlight",
+      caps: ved.captions?.caps !== false,
       color: ved.captions?.color || "#facc15",
       fontSize: ved.captions?.fontSize || 40,
       y: ved.captions?.y || 0.72,
@@ -1328,18 +1392,54 @@ $("#ved-cap-y")?.addEventListener("input", e => {
   if ($("#ved-cap-y-val")) $("#ved-cap-y-val").textContent = pct;
   drawVEditor();
 });
+const VED_WORD_COLORS = { g: "#35d07f", green: "#35d07f", y: "#ffd21f", yellow: "#ffd21f", r: "#ff4338", red: "#ff4338" };
+const VED_WORD_CODES = { "#35d07f": "g", "#ffd21f": "y", "#ff4338": "r" };
+
+function vedFormatCapWords(words) {
+  return (words || []).map(w => {
+    if (!w.color) return w.word;
+    const code = VED_WORD_CODES[String(w.color).toLowerCase()] || w.color;
+    return `[${code}:${w.word}]`;
+  }).join(" ");
+}
+
+function vedParseCapWords(text, oldWords) {
+  const tokens = String(text || "").trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return [];
+  const old = oldWords || [];
+  const totalStart = old[0]?.start || 0;
+  const totalEnd = old[old.length - 1]?.end || Math.max(1, tokens.length * 0.4);
+  return tokens.map((tok, idx) => {
+    let word = tok, color = null;
+    const m = /^\[(g|y|r|green|yellow|red|#[0-9a-f]{6}):([^\]]+)\]$/i.exec(tok);
+    if (m) {
+      const k = m[1].toLowerCase();
+      color = VED_WORD_COLORS[k] || k;
+      word = m[2];
+    }
+    if (idx < old.length) return { word, start: old[idx].start, end: old[idx].end, ...(color ? { color } : {}) };
+    const step = (totalEnd - totalStart) / tokens.length;
+    return { word, start: totalStart + idx * step, end: totalStart + (idx + 1) * step, ...(color ? { color } : {}) };
+  });
+}
+
+$("#ved-cap-caps")?.addEventListener("change", e => {
+  if (!ved.captions) return;
+  ved.captions.caps = e.target.checked;
+  drawVEditor();
+});
+$("#ved-stage-bg")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-bg]");
+  if (!b || !ved.frame?.stage) return;
+  ved.frame.stage.bg = b.dataset.bg;
+  vedSyncControls();
+  drawVEditor();
+});
 $("#ved-cap-text")?.addEventListener("input", e => {
   if (!ved.captions?.words?.length) return;
-  const edited = e.target.value.trim().split(/\s+/).filter(Boolean);
-  if (!edited.length) return;
-  const old = ved.captions.words;
-  const totalEnd = old[old.length - 1].end;
-  const totalStart = old[0].start;
-  ved.captions.words = edited.map((word, idx) => {
-    if (idx < old.length) return { word, start: old[idx].start, end: old[idx].end };
-    const step = (totalEnd - totalStart) / edited.length;
-    return { word, start: totalStart + idx * step, end: totalStart + (idx + 1) * step };
-  });
+  const parsed = vedParseCapWords(e.target.value, ved.captions.words);
+  if (!parsed.length) return;
+  ved.captions.words = parsed;
   drawVEditor();
 });
 
@@ -1434,4 +1534,101 @@ $("#ved-ai-preload")?.addEventListener("click", async () => {
     btn.disabled = false;
     vedRefreshAiPackStatus();
   }
+});
+
+/* ---- Simplified 3D Phone Animation (inside Vertical Editor) ---- */
+function vedGetAnimCfg() {
+  if (!ved.anim) {
+    const _p = typeof loadClipperPrefs === "function" ? loadClipperPrefs().anim : null;
+    ved.anim = clone(_p || (typeof defaultAnimPrefs === "function" ? defaultAnimPrefs() : { enabled: false, scope: "all", color: 0xc5d5e4, ti: false, surface: "wood", sticker: true, stickerPreset: "follow", stickerText: "Follow for more clips" }));
+  }
+  return ved.anim;
+}
+
+function vedSaveAnimCfg() {
+  const c = vedGetAnimCfg();
+  if (typeof saveClipperPrefs === "function") saveClipperPrefs({ anim: clone(c) });
+  if (c.scope === "individual") {
+    if (state.outputs[ved.index]) state.outputs[ved.index].vAnim = clone(c);
+  } else {
+    state.outputs.forEach(out => { out.vAnim = clone(c); });
+  }
+}
+
+function vedSyncAnimUI() {
+  const c = vedGetAnimCfg();
+  const btn = $("#ved-anim-toggle");
+  if (btn) {
+    btn.textContent = c.enabled ? "3D phone animation: On" : "3D phone animation: Off";
+    btn.classList.toggle("on", !!c.enabled);
+    btn.setAttribute("aria-pressed", String(!!c.enabled));
+  }
+  document.querySelectorAll("#ved-anim-sw button").forEach(b => b.classList.toggle("on", Number(b.dataset.c) === Number(c.color)));
+  document.querySelectorAll("#ved-anim-surf button").forEach(b => b.classList.toggle("on", b.dataset.surf === (c.surface || "wood")));
+  if ($("#ved-anim-stk-on")) $("#ved-anim-stk-on").checked = c.sticker !== false;
+  document.querySelectorAll("#ved-anim-stk-presets button").forEach(b => b.classList.toggle("on", b.dataset.stk === (c.stickerPreset || "follow")));
+  if ($("#ved-anim-stk-txt") && document.activeElement !== $("#ved-anim-stk-txt")) $("#ved-anim-stk-txt").value = c.stickerText || "";
+  document.querySelectorAll("#ved-anim-scope button").forEach(b => b.classList.toggle("on", b.dataset.ascope === (c.scope || "all")));
+}
+
+$("#ved-anim-toggle")?.addEventListener("click", () => {
+  const c = vedGetAnimCfg();
+  c.enabled = !c.enabled;
+  vedSaveAnimCfg();
+  vedSyncAnimUI();
+});
+$("#ved-anim-sw")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-c]");
+  if (!b) return;
+  const c = vedGetAnimCfg();
+  c.color = Number(b.dataset.c);
+  c.ti = b.dataset.ti === "1";
+  vedSaveAnimCfg();
+  vedSyncAnimUI();
+});
+$("#ved-anim-surf")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-surf]");
+  if (!b) return;
+  const c = vedGetAnimCfg();
+  c.surface = b.dataset.surf;
+  vedSaveAnimCfg();
+  vedSyncAnimUI();
+});
+$("#ved-anim-stk-on")?.addEventListener("change", e => {
+  const c = vedGetAnimCfg();
+  c.sticker = e.target.checked;
+  vedSaveAnimCfg();
+});
+$("#ved-anim-stk-presets")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-stk]");
+  if (!b || typeof ANIM_STICKERS === "undefined") return;
+  const k = b.dataset.stk, S = ANIM_STICKERS[k];
+  if (!S) return;
+  const c = vedGetAnimCfg();
+  c.stickerPreset = k;
+  c.stickerText = S.text;
+  c.sticker = true;
+  vedSaveAnimCfg();
+  vedSyncAnimUI();
+});
+$("#ved-anim-stk-txt")?.addEventListener("input", e => {
+  const c = vedGetAnimCfg();
+  c.stickerText = e.target.value.slice(0, 48);
+  vedSaveAnimCfg();
+});
+$("#ved-anim-scope")?.addEventListener("click", e => {
+  const b = e.target.closest("button[data-ascope]");
+  if (!b) return;
+  const c = vedGetAnimCfg();
+  c.scope = b.dataset.ascope === "individual" ? "individual" : "all";
+  vedSaveAnimCfg();
+  vedSyncAnimUI();
+});
+$("#ved-anim-preview")?.addEventListener("click", () => {
+  vedSaveLayersToState();
+  vedSaveAnimCfg();
+  const idx = ved.index;
+  const frame = clone(ved.frame);
+  closeVerticalEditor(false);
+  if (typeof openAnimator === "function") openAnimator(idx, { frame, returnToVEditor: true });
 });
