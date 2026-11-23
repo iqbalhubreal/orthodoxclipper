@@ -343,6 +343,7 @@ function vedSyncControls() {
   const sqOn = !!ved.frame?.square1x1;
   document.querySelectorAll("#ved-aspect button").forEach(b => b.classList.toggle("on", (b.dataset.aspect === "square") === sqOn));
   vedSyncClipBar();
+  vedRefreshAiPackStatus();
   document.querySelectorAll("#ved-sil-sens button").forEach(b => b.classList.toggle("on", b.dataset.sens === (ved.silSens || "normal")));
   if ($("#ved-sil-status")) {
     $("#ved-sil-status").textContent = ved.silence?.enabled
@@ -944,29 +945,116 @@ async function vedScanSilences(blob, sensKey = "normal") {
   return { enabled: savedSec >= 0.2, sensitivity: sensKey, segments, savedSec, pauseCount, totalDur: buf.duration };
 }
 
-async function getVedFaceLandmarker() {
-  if (ved.faceLandmarker) return ved.faceLandmarker;
+function vedSetProg(prefix, pct, label, show = true) {
+  const wrap = $("#" + prefix);
+  if (!wrap) return;
+  wrap.hidden = !show;
+  const fill = $("#" + prefix + "-fill");
+  const lbl = $("#" + prefix + "-lbl");
+  const pctEl = $("#" + prefix + "-pct");
+  const safe = Math.max(0, Math.min(100, Number(pct) || 0));
+  if (fill) fill.style.width = safe.toFixed(1) + "%";
+  if (lbl && label != null) lbl.textContent = label;
+  if (pctEl) pctEl.textContent = Math.round(safe) + "%";
+}
+
+function vedFmtMB(bytes) {
+  return (Math.max(0, Number(bytes) || 0) / 1048576).toFixed(1) + " MB";
+}
+
+async function vedFetchWithProgress(url, onProgress) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const total = Number(res.headers.get("content-length")) || 0;
+  if (!res.body?.getReader) {
+    const buf = new Uint8Array(await res.arrayBuffer());
+    onProgress?.(buf.byteLength, buf.byteLength);
+    return buf;
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.byteLength;
+    onProgress?.(loaded, total);
+  }
+  const out = new Uint8Array(loaded);
+  let offset = 0;
+  for (const c of chunks) { out.set(c, offset); offset += c.byteLength; }
+  onProgress?.(loaded, total || loaded);
+  return out;
+}
+
+async function vedRefreshAiPackStatus() {
+  const st = $("#ved-ai-status"), btn = $("#ved-ai-preload");
+  if (!st || (btn && btn.disabled)) return;
+  try {
+    if (!("caches" in window)) { st.textContent = "Online only"; return; }
+    const cache = await caches.open("clipper-ffmpeg-core-0.12.6");
+    const keys = await cache.keys();
+    const hasFace = keys.some(r => r.url.includes("face_landmarker.task"));
+    const modelKey = ved.capModel === "base" ? "whisper-base" : "whisper-tiny";
+    const hasCap = keys.some(r => r.url.includes(modelKey) && r.url.includes(".onnx"));
+    if (hasFace && hasCap) {
+      st.textContent = "Ready offline ✓";
+      if (btn) btn.textContent = "All AI packs ready ✓";
+    } else if (hasFace || hasCap) {
+      st.textContent = "Partially cached";
+      if (btn) btn.textContent = "Download remaining AI packs";
+    } else {
+      st.textContent = "Not downloaded";
+      if (btn) btn.textContent = "Download AI packs";
+    }
+  } catch {
+    st.textContent = "Tap to download";
+  }
+}
+
+async function getVedFaceLandmarker(onProgress) {
+  if (ved.faceLandmarker) { onProgress?.(100, "Face AI ready"); return ved.faceLandmarker; }
+  onProgress?.(5, "Loading face AI runtime...");
   const mod = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm");
   const { FaceLandmarker, FilesetResolver } = mod;
   const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const modelUrl = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+  let modelAssetBuffer = null;
+  try {
+    modelAssetBuffer = await vedFetchWithProgress(modelUrl, (loaded, total) => {
+      const ratio = total > 0 ? loaded / total : 0.5;
+      const pct = 10 + ratio * 85;
+      const sizeTxt = total > 0 ? `${vedFmtMB(loaded)} / ${vedFmtMB(total)}` : vedFmtMB(loaded);
+      onProgress?.(pct, `Downloading face AI (${sizeTxt})...`);
+    });
+  } catch {}
+  onProgress?.(96, "Starting face detector...");
   ved.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-      delegate: "GPU",
-    },
+    baseOptions: modelAssetBuffer
+      ? { modelAssetBuffer, delegate: "GPU" }
+      : { modelAssetPath: modelUrl, delegate: "GPU" },
     runningMode: "IMAGE",
     numFaces: 4,
   });
+  onProgress?.(100, "Face AI ready");
+  vedRefreshAiPackStatus();
   return ved.faceLandmarker;
 }
 
 async function vedAutoCenterFaces() {
   const v = ved.video;
   if (!v || !v.videoWidth || !ved.frame) return;
-  const st = $("#ved-face-status");
-  if (st) st.textContent = "Scanning...";
+  const st = $("#ved-face-status"), btn = $("#ved-face-center");
+  if (btn) btn.disabled = true;
+  if (st) st.textContent = ved.faceLandmarker ? "Scanning..." : "Downloading...";
+  const needsLoad = !ved.faceLandmarker;
   try {
-    const fl = await getVedFaceLandmarker();
+    const fl = await getVedFaceLandmarker((pct, lbl) => {
+      if (needsLoad) vedSetProg("ved-face-prog", pct, lbl, true);
+    });
+    vedSetProg("ved-face-prog", 100, "Done", false);
+    if (st) st.textContent = "Scanning...";
     const cv = document.createElement("canvas");
     const scale = Math.min(1, 640 / v.videoWidth);
     cv.width = Math.round(v.videoWidth * scale);
@@ -1008,6 +1096,9 @@ async function vedAutoCenterFaces() {
     console.warn("Auto-center face failed:", err);
     if (st) st.textContent = "Unavailable";
     toast("Face detector unavailable offline.", true);
+  } finally {
+    if (btn) btn.disabled = false;
+    vedSetProg("ved-face-prog", 0, "", false);
   }
 }
 
@@ -1119,6 +1210,39 @@ function vedNormalizeWhisperWords(result, totalDur) {
   return out;
 }
 
+async function vedLoadWhisper(modelId, onProgress) {
+  if (ved.transcribers[modelId]) { onProgress?.(100, "Captions AI ready"); return ved.transcribers[modelId]; }
+  onProgress?.(2, "Loading AI engine...");
+  const { pipeline, env } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0/+esm");
+  env.allowLocalModels = false;
+  const device = navigator.gpu ? "webgpu" : "wasm";
+  const fileMap = {};
+  const labelName = modelId.includes("base") ? "Whisper Base" : "Whisper Tiny";
+  ved.transcribers[modelId] = await pipeline("automatic-speech-recognition", modelId, {
+    device,
+    dtype: device === "webgpu" ? "fp32" : "q8",
+    progress_callback: info => {
+      if (!info) return;
+      if (info.file) {
+        const prev = fileMap[info.file] || { loaded: 0, total: 0 };
+        const total = Number(info.total) || prev.total || 0;
+        const loaded = info.status === "done"
+          ? (total || prev.loaded)
+          : (Number(info.loaded) || (total && info.progress ? total * (info.progress / 100) : prev.loaded));
+        fileMap[info.file] = { loaded, total };
+      }
+      let sumL = 0, sumT = 0;
+      for (const k in fileMap) { sumL += fileMap[k].loaded; sumT += fileMap[k].total; }
+      const pct = sumT > 0 ? Math.min(99, (sumL / sumT) * 100) : (Number(info.progress) || 5);
+      const sizeTxt = sumT > 0 ? ` (${vedFmtMB(sumL)} / ${vedFmtMB(sumT)})` : "";
+      onProgress?.(pct, `Downloading ${labelName}${sizeTxt}...`);
+    },
+  });
+  onProgress?.(100, `${labelName} ready`);
+  vedRefreshAiPackStatus();
+  return ved.transcribers[modelId];
+}
+
 async function vedGenerateCaptions() {
   const item = state.outputs[ved.index];
   if (!item?.blob) return;
@@ -1129,15 +1253,10 @@ async function vedGenerateCaptions() {
     const audio16k = await vedExtract16kMono(item.blob, ved.silence);
     const modelId = ved.capModel === "base" ? "onnx-community/whisper-base" : "onnx-community/whisper-tiny";
     if (!ved.transcribers[modelId]) {
-      if (st) st.textContent = "Downloading AI model (1st time)...";
-      const { pipeline, env } = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0/+esm");
-      env.allowLocalModels = false;
-      const device = navigator.gpu ? "webgpu" : "wasm";
-      ved.transcribers[modelId] = await pipeline("automatic-speech-recognition", modelId, {
-        device,
-        dtype: device === "webgpu" ? "fp32" : "q8",
-      });
+      if (st) st.textContent = "Downloading AI model...";
+      await vedLoadWhisper(modelId, (pct, lbl) => vedSetProg("ved-cap-prog", pct, lbl, true));
     }
+    vedSetProg("ved-cap-prog", 100, "Ready", false);
     if (st) st.textContent = "Transcribing...";
     const transcriber = ved.transcribers[modelId];
     const result = await transcriber(audio16k, { return_timestamps: "word", chunk_length_s: 30, stride_length_s: 5 });
@@ -1164,6 +1283,7 @@ async function vedGenerateCaptions() {
     toast("Could not generate captions. Check connection for 1st-time model download.", true);
   } finally {
     btn.disabled = false;
+    vedSetProg("ved-cap-prog", 0, "", false);
     vedSyncControls();
   }
 }
@@ -1287,4 +1407,31 @@ $("#ved-stitch-del")?.addEventListener("click", () => {
   ved.stitch = null;
   vedSyncControls();
   toast("Stitched clip removed.");
+});
+
+$("#ved-ai-preload")?.addEventListener("click", async () => {
+  const btn = $("#ved-ai-preload"), st = $("#ved-ai-status");
+  if (!btn) return;
+  btn.disabled = true;
+  if (st) st.textContent = "Downloading...";
+  try {
+    await getVedFaceLandmarker((pct, lbl) => {
+      vedSetProg("ved-ai-prog", pct * 0.2, lbl, true);
+    });
+    const modelId = ved.capModel === "base" ? "onnx-community/whisper-base" : "onnx-community/whisper-tiny";
+    await vedLoadWhisper(modelId, (pct, lbl) => {
+      vedSetProg("ved-ai-prog", 20 + pct * 0.8, lbl, true);
+    });
+    vedSetProg("ved-ai-prog", 100, "All AI packs saved offline ✓", true);
+    toast("AI packs downloaded and saved for offline use.");
+    setTimeout(() => vedSetProg("ved-ai-prog", 0, "", false), 2200);
+  } catch (err) {
+    console.warn("AI pack preload failed:", err);
+    vedSetProg("ved-ai-prog", 0, "", false);
+    if (st) st.textContent = "Download failed";
+    toast("Could not download AI packs. Check your internet connection.", true);
+  } finally {
+    btn.disabled = false;
+    vedRefreshAiPackStatus();
+  }
 });

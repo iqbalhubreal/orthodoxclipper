@@ -184,6 +184,7 @@
         <p class="ed-cap">Frame format</p>
         <div class="ed-seg" id="ved-aspect" role="group" aria-label="Frame format"><button type="button" data-aspect="full" class="on">9:16 Full</button><button type="button" data-aspect="square">1:1 Square</button></div>
         <div class="ved-face-row" style="margin-top:8px"><button type="button" class="btn ed-mini" id="ved-face-center">Auto-center face</button><span id="ved-face-status" class="hint" style="margin:0;font-size:11px"></span></div>
+        <div id="ved-face-prog" class="ved-prog" hidden><div class="ved-prog-track"><div class="ved-prog-fill" id="ved-face-prog-fill"></div></div><div class="ved-prog-txt"><span id="ved-face-prog-lbl">Downloading face AI...</span><span id="ved-face-prog-pct">0%</span></div></div>
       </div>
       <div class="ved-card span-full">
         <div class="ed-clips-head"><p class="ed-cap">Smart cut (silences)</p><span id="ved-sil-status" class="hint" style="margin:0;font-size:11px">Off</span></div>
@@ -194,6 +195,7 @@
         <div class="ed-clips-head"><p class="ed-cap">Auto-captions</p><span id="ved-cap-status" class="hint" style="margin:0;font-size:11px">Off</span></div>
         <div class="ed-seg" id="ved-cap-model" role="group" aria-label="Caption model"><button type="button" data-cmodel="tiny" class="on">Fast (Tiny)</button><button type="button" data-cmodel="base">Better (Base)</button></div>
         <div class="ed-tool-row" style="margin-top:8px"><button type="button" class="btn ed-mini" id="ved-cap-gen">Generate captions</button><button type="button" class="btn ed-mini del" id="ved-cap-clear" hidden>Remove</button></div>
+        <div id="ved-cap-prog" class="ved-prog" hidden><div class="ved-prog-track"><div class="ved-prog-fill" id="ved-cap-prog-fill"></div></div><div class="ved-prog-txt"><span id="ved-cap-prog-lbl">Downloading AI model...</span><span id="ved-cap-prog-pct">0%</span></div></div>
         <div id="ved-cap-opts" style="margin-top:8px" hidden>
           <div class="ed-seg" id="ved-cap-style"><button type="button" data-cstyle="highlight" class="on">Highlight</button><button type="button" data-cstyle="word">1 Word</button><button type="button" data-cstyle="clean">Clean</button></div>
           <div class="ved-colors" id="ved-cap-colors" style="margin-top:8px"></div>
@@ -251,6 +253,11 @@
       <div class="ved-card span-full">
         <div class="ed-clips-head"><p class="ed-cap">Overlays</p><span id="ved-ov-count" class="hint" style="margin:0;font-size:11px">0/5 saved</span></div>
         <div id="ved-ov-list" class="ved-ov-list"></div>
+      </div>
+      <div class="ved-card span-full">
+        <div class="ed-clips-head"><p class="ed-cap">Offline AI packs (1-time)</p><span id="ved-ai-status" class="hint" style="margin:0;font-size:11px">Checking...</span></div>
+        <div class="ed-tool-row"><button type="button" class="btn ed-mini" id="ved-ai-preload">Download AI packs</button></div>
+        <div id="ved-ai-prog" class="ved-prog" hidden><div class="ved-prog-track"><div class="ved-prog-fill" id="ved-ai-prog-fill"></div></div><div class="ved-prog-txt"><span id="ved-ai-prog-lbl">Downloading...</span><span id="ved-ai-prog-pct">0%</span></div></div>
       </div>
     </div>
   </div>

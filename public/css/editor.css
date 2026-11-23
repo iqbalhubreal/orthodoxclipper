@@ -117,3 +117,9 @@
 .ved-broll-name{flex:1;min-width:0;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ved-broll-ctrl{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end}
 #ved-stitch-row{flex-direction:row;align-items:center;justify-content:space-between}
+
+.ved-prog{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.ved-prog[hidden]{display:none}
+.ved-prog-track{height:8px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.ved-prog-fill{height:100%;width:0%;background:var(--accent,#7764e8);border-radius:99px;transition:width .18s ease}
+.ved-prog-txt{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:6px}
