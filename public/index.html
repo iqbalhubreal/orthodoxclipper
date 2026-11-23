@@ -208,6 +208,12 @@
         <div class="ed-tool-row"><button type="button" class="btn ed-mini" id="ved-bgm-pick">+ Pick audio</button><button type="button" class="btn ed-mini del" id="ved-bgm-clear" hidden>Remove</button><input id="ved-bgm-file" type="file" accept="audio/*" hidden></div>
         <label class="ed-time" id="ved-bgm-vol-wrap" style="margin-top:6px" hidden>Music volume (<span id="ved-bgm-vol-val">15</span>%)<input id="ved-bgm-vol" type="range" min="2" max="60" step="2" value="15"></label>
       </div>
+      <div class="ved-card span-full">
+        <div class="ed-clips-head"><p class="ed-cap">B-Roll &amp; stitch</p><span id="ved-broll-count" class="hint" style="margin:0;font-size:11px">0 clips</span></div>
+        <div class="ed-tool-row"><button type="button" class="btn ed-mini" id="ved-broll-add">+ B-Roll</button><button type="button" class="btn ed-mini" id="ved-stitch-add">+ Stitch clip</button><input id="ved-broll-file" type="file" accept="video/*" hidden><input id="ved-stitch-file" type="file" accept="video/*" hidden></div>
+        <div id="ved-broll-list" class="ved-broll-list" style="margin-top:8px"></div>
+        <div id="ved-stitch-row" class="ved-broll-item" style="margin-top:6px" hidden><span id="ved-stitch-name" class="ved-broll-name"></span><button type="button" class="ved-ov-del" id="ved-stitch-del" aria-label="Remove stitched clip">✕</button></div>
+      </div>
       <div class="ed-tool-row span-full"><button id="ved-add-blur" class="btn" type="button">+ Blur</button><button id="ved-add-text" class="btn" type="button" hidden>+ Text</button><button id="ved-import" class="btn" type="button">+ Image</button><input id="ved-file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden></div>
       <div id="ved-layer-tools" class="ved-card span-full" hidden>
         <div id="ved-blur-opts" hidden>

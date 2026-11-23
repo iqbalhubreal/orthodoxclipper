@@ -111,3 +111,9 @@
 .ved-timing-btns{display:flex;gap:4px}
 .ved-timing-btns .btn{min-height:31px}
 .ved-face-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ved-broll-list{display:flex;flex-direction:column;gap:6px}
+.ved-broll-item{display:flex;flex-direction:column;gap:6px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}
+.ved-broll-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.ved-broll-name{flex:1;min-width:0;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ved-broll-ctrl{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end}
+#ved-stitch-row{flex-direction:row;align-items:center;justify-content:space-between}

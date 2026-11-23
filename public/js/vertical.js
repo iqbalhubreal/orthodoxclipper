@@ -171,6 +171,25 @@ async function buildMixedAudioBuffer(item, silenceCfg, bgmCfg, targetDur) {
         }
       }
     }
+    if (item.vStitch?.blob) {
+      let stBuf = null;
+      try { stBuf = await ac.decodeAudioData(await item.vStitch.blob.arrayBuffer()); } catch {}
+      const stLen = stBuf ? stBuf.length : Math.round((targetDur - outLen / sr) * sr);
+      if (stLen > 0) {
+        const combLen = outLen + stLen;
+        const combCh = Array.from({ length: chs }, (_, c) => {
+          const arr = new Float32Array(combLen);
+          arr.set(outCh[c], 0);
+          if (stBuf) {
+            const sSrc = stBuf.getChannelData(Math.min(c, stBuf.numberOfChannels - 1));
+            arr.set(sSrc.subarray(0, stLen), outLen);
+          }
+          return arr;
+        });
+        outCh = combCh;
+        outLen = combLen;
+      }
+    }
     if (bgmCfg?.blob) {
       const bgmBuf = await ac.decodeAudioData(await bgmCfg.blob.arrayBuffer());
       const vol = clamp(Number(bgmCfg.volume) || 0.15, 0.02, 0.8);
@@ -227,6 +246,20 @@ async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg
       output.addAudioTrack(audioSource);
     }
     await output.start();
+    const brollSinks = [];
+    for (const br of (item.vBrolls || [])) {
+      if (!br?.blob) continue;
+      const bIn = new Input({ formats: ALL_FORMATS, source: new BlobSource(br.blob) });
+      const bTrk = await bIn.getPrimaryVideoTrack();
+      const bDur = await bIn.computeDuration().catch(() => 3);
+      if (bTrk) brollSinks.push({ br, input: bIn, sink: new VideoSampleSink(bTrk), dur: Math.max(0.2, bDur) });
+      else try { bIn.dispose?.(); } catch {}
+    }
+    let stitchInput = null, stitchDur = 0;
+    if (item.vStitch?.blob) {
+      stitchInput = new Input({ formats: ALL_FORMATS, source: new BlobSource(item.vStitch.blob) });
+      stitchDur = await stitchInput.computeDuration().catch(() => 0);
+    }
     const videoTrack = await input.getPrimaryVideoTrack();
     const sink = new VideoSampleSink(videoTrack);
     let boxes = null, sw = 0, sh = 0, segIdx = 0, lastOutTs = -1;
@@ -262,6 +295,20 @@ async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg
         else drawDividerLines(targetCtx, W, TOTAL_H, frame);
       }
       targetCtx.restore();
+      if (brollSinks.length) {
+        const act = brollSinks.find(x => outTs >= (Number(x.br.startTime) || 0) - 0.01 && outTs <= (Number(x.br.endTime) || 0) + 0.01);
+        if (act) {
+          let bSample = null;
+          try {
+            bSample = await act.sink.getSample((outTs - (Number(act.br.startTime) || 0)) % act.dur);
+            if (bSample) {
+              const rw = W, rh = act.br.mode === "top" ? Math.round(cH * 0.5) : cH;
+              const m = mapBox({ x: 0, y: 0, w: bSample.displayWidth, h: bSample.displayHeight }, rw, rh, false);
+              bSample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, m.dx, cY + m.dy, m.dw, m.dh);
+            }
+          } finally { try { bSample?.close(); } catch {} }
+        }
+      }
       if (layers.length) {
         compCtx.drawImage(baseCv, 0, 0, W, TOTAL_H);
         drawVerticalLayers(compCtx, baseCv, W, TOTAL_H, layers, outTs);
@@ -275,6 +322,55 @@ async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg
       await videoSource.add(outTs, dur);
       if (onProgress && duration > 0) onProgress(Math.min(0.95, ts / duration));
     }
+    if (stitchInput) {
+      const stTrack = await stitchInput.getPrimaryVideoTrack();
+      if (stTrack) {
+        const stSink = new VideoSampleSink(stTrack);
+        const stOffset = Math.max(outDur, lastOutTs + 1 / FPS);
+        let stBoxes = null, stSw = 0, stSh = 0;
+        for await (const sSample of stSink.samples()) {
+          if (state.cancelled) { sSample.close(); throw new Error("Cancelled"); }
+          const outTs = Math.max(lastOutTs + 1 / 60, stOffset + sSample.timestamp);
+          lastOutTs = outTs;
+          if (!stBoxes) {
+            stSw = sSample.displayWidth; stSh = sSample.displayHeight;
+            const px = r => ({ x: r.x * stSw, y: r.y * stSh, w: r.w * stSw, h: r.h * stSh });
+            stBoxes = frameBoxes.map((box, idx) => {
+              const s = slots[idx];
+              const dx = Math.round(s.x * W), dy = cY + Math.round(s.y * cH), dw = Math.round(s.w * W), dh = Math.round(s.h * cH);
+              return { m: mapBox(px(box), dw, dh, frame.fit), xOff: dx, yOff: dy };
+            });
+          }
+          const compCtx = animEnabled ? animSrcCtx : ctx;
+          const targetCtx = baseCtx || compCtx;
+          targetCtx.fillStyle = "#000"; targetCtx.fillRect(0, 0, W, TOTAL_H);
+          targetCtx.save();
+          if (sq) { targetCtx.beginPath(); targetCtx.rect(0, cY, W, cH); targetCtx.clip(); }
+          if (stageEnabled) {
+            if (sq) targetCtx.translate(0, cY);
+            drawStageComposition(targetCtx, sSample, stSw, stSh, frameBoxes, frame, W, cH, { energy: 0.45, timestamp: outTs });
+          } else {
+            for (const { m, xOff, yOff } of stBoxes) sSample.draw(targetCtx, m.sx, m.sy, m.sw, m.sh, xOff + m.dx, yOff + m.dy, m.dw, m.dh);
+            if (sq) { targetCtx.translate(0, cY); drawDividerLines(targetCtx, W, cH, frame); }
+            else drawDividerLines(targetCtx, W, TOTAL_H, frame);
+          }
+          targetCtx.restore();
+          if (layers.length) {
+            compCtx.drawImage(baseCv, 0, 0, W, TOTAL_H);
+            drawVerticalLayers(compCtx, baseCv, W, TOTAL_H, layers, outTs);
+          }
+          if (item.vCaptions?.enabled && typeof drawCaptions === "function") {
+            drawCaptions(compCtx, W, TOTAL_H, item.vCaptions, outTs);
+          }
+          if (animEnabled) animatorRenderAt(outTs, ctx, animSrcCv, animCfg, W, TOTAL_H, outDur + stitchDur);
+          const dur = Math.max(1 / 60, sSample.duration || 1 / FPS);
+          sSample.close();
+          await videoSource.add(outTs, dur);
+        }
+      }
+      try { stitchInput.dispose?.(); } catch {}
+    }
+    for (const x of brollSinks) { try { x.input.dispose?.(); } catch {} }
     if (audioSource && mixedAudio) await audioSource.add(mixedAudio);
     videoSource.close();
     audioSource?.close();
@@ -289,7 +385,7 @@ async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg
 async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, animCfg = null) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
-  if ((item.vSilence?.enabled && item.vSilence.segments?.length) || item.vBgm?.blob) {
+  if ((item.vSilence?.enabled && item.vSilence.segments?.length) || item.vBgm?.blob || (item.vBrolls && item.vBrolls.length) || item.vStitch?.blob) {
     try {
       return await makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg);
     } catch (err) {
@@ -415,7 +511,7 @@ async function makeVertical(ff, i, frame, onProgress) {
   item.vFrame = clone(clipFrame);
   const _allPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { anim: { enabled: false } };
   const animCfg = clone(item.vAnim || _allPrefs.anim || { enabled: false });
-  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled || !!animCfg.enabled || !!clipFrame.square1x1 || !!(item.vLayers && item.vLayers.length) || !!item.vSilence?.enabled || !!item.vBgm?.blob || !!item.vCaptions?.enabled;
+  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled || !!animCfg.enabled || !!clipFrame.square1x1 || !!(item.vLayers && item.vLayers.length) || !!item.vSilence?.enabled || !!item.vBgm?.blob || !!item.vCaptions?.enabled || !!(item.vBrolls && item.vBrolls.length) || !!item.vStitch?.blob;
   let vBlob = useWebCodecs
     ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress, null, animCfg), state.cancelPromise])
     : null;

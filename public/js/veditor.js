@@ -1,6 +1,6 @@
 "use strict";
 /* Vertical Editor: pre-vertical blur, image overlays, movable/resizable text boxes, clip switcher, and Applies-to-all / Individual toggle (text only in Individual mode). */
-const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", silSens: "normal", silence: null, bgm: null, bgmAudio: null, faceLandmarker: null, capModel: "tiny", captions: null, transcribers: {} };
+const ved = { index: 0, layers: [], sel: -1, drag: null, k: 1, video: null, baseCv: null, pixCv: null, blurCv: null, frame: null, returnToEditor: false, guides: null, scope: "all", silSens: "normal", silence: null, bgm: null, bgmAudio: null, faceLandmarker: null, capModel: "tiny", captions: null, transcribers: {}, brolls: [], stitch: null };
 
 const VED_FONTS = [
   { id: "classic", name: "Classic", weight: 700, family: '"Inter", system-ui, -apple-system, sans-serif' },
@@ -46,6 +46,13 @@ function vedSeek(t) {
     const timer = setTimeout(done, 3000);
     v.addEventListener("seeked", done);
     v.currentTime = Math.min(Math.max(0, t), v.duration || t);
+    if (ved.brolls?.length) {
+      for (const b of ved.brolls) {
+        if (b.video && b.video.duration && t >= b.startTime && t <= b.endTime) {
+          try { b.video.currentTime = (t - b.startTime) % b.video.duration; } catch {}
+        }
+      }
+    }
   });
 }
 function ensureCanvas(cur, w, h) {
@@ -277,6 +284,16 @@ function drawVEditor() {
   } else {
     bctx.drawImage(v, 0, 0, W, H);
   }
+  if (ved.brolls?.length) {
+    const activeBr = ved.brolls.find(b => curTime >= (Number(b.startTime) || 0) - 0.01 && curTime <= (Number(b.endTime) || 0) + 0.01);
+    if (activeBr?.video && activeBr.video.readyState >= 2 && activeBr.video.videoWidth) {
+      const bv = activeBr.video;
+      const sq = !!ved.frame?.square1x1, cY = sq ? Math.round((H - W) / 2) : 0, cH = sq ? W : H;
+      const rx = 0, ry = cY, rw = W, rh = activeBr.mode === "top" ? Math.round(cH * 0.5) : cH;
+      const m = mapBox({ x: 0, y: 0, w: bv.videoWidth, h: bv.videoHeight }, rw, rh, false);
+      bctx.drawImage(bv, m.sx, m.sy, m.sw, m.sh, rx + m.dx, ry + m.dy, m.dw, m.dh);
+    }
+  }
   ctx.drawImage(ved.baseCv, 0, 0, W, H);
   drawVerticalLayers(ctx, ved.baseCv, W, H, ved.layers, curTime);
   if (ved.captions?.enabled) drawCaptions(ctx, W, H, ved.captions, curTime);
@@ -360,6 +377,23 @@ function vedSyncControls() {
     }
   }
 
+  if ($("#ved-broll-count")) $("#ved-broll-count").textContent = `${ved.brolls.length} clip${ved.brolls.length === 1 ? "" : "s"}`;
+  if ($("#ved-broll-list")) {
+    $("#ved-broll-list").innerHTML = ved.brolls.map((b, idx) => `
+      <div class="ved-broll-item" data-bidx="${idx}">
+        <div class="ved-broll-top">
+          <span class="ved-broll-name">${escapeHTML(b.name || `B-Roll ${idx + 1}`)}</span>
+          <button type="button" class="ved-ov-del" data-bdel="${idx}" aria-label="Remove B-Roll">✕</button>
+        </div>
+        <div class="ved-broll-ctrl">
+          <label class="stage-field"><span>Start (s)</span><input type="number" min="0" step="0.1" data-bstart="${idx}" value="${Number(b.startTime) || 0}"></label>
+          <label class="stage-field"><span>End (s)</span><input type="number" min="0" step="0.1" data-bend="${idx}" value="${Number(b.endTime) || 3}"></label>
+          <button type="button" class="btn ed-mini" data-bmode="${idx}">${b.mode === "top" ? "Top half" : "Full"}</button>
+        </div>
+      </div>`).join("");
+  }
+  if ($("#ved-stitch-row")) $("#ved-stitch-row").hidden = !ved.stitch?.blob;
+  if ($("#ved-stitch-name")) $("#ved-stitch-name").textContent = ved.stitch?.blob ? `Stitched after: ${ved.stitch.name}` : "";
   if (!isIndiv && ved.layers[ved.sel]?.kind === "text") ved.sel = -1;
   const l = ved.layers[ved.sel];
   $("#ved-layer-tools").hidden = !l;
@@ -413,6 +447,12 @@ function vedRenderOverlayList() {
 function cloneBgm(bgm) {
   return bgm?.blob ? { name: bgm.name || "Audio track", volume: bgm.volume ?? 0.15, blob: bgm.blob } : null;
 }
+function cloneBrolls(list) {
+  return (list || []).filter(b => b?.blob).map(b => ({ name: b.name, blob: b.blob, url: b.url, video: b.video, startTime: Number(b.startTime) || 0, endTime: Number(b.endTime) || 3, mode: b.mode === "top" ? "top" : "full" }));
+}
+function cloneStitch(st) {
+  return st?.blob ? { name: st.name, blob: st.blob, url: st.url } : null;
+}
 function vedSaveLayersToState() {
   const clean = cloneLayers(ved.layers);
   const sq = !!ved.frame?.square1x1;
@@ -426,6 +466,8 @@ function vedSaveLayersToState() {
       out.vSilence = ved.silence ? clone(ved.silence) : null;
       out.vBgm = cloneBgm(ved.bgm);
       out.vCaptions = ved.captions ? clone(ved.captions) : null;
+      out.vBrolls = cloneBrolls(ved.brolls);
+      out.vStitch = cloneStitch(ved.stitch);
     }
     return;
   }
@@ -441,7 +483,7 @@ function vedSaveLayersToState() {
       out.vFrame = clone(out.vFrame || ved.frame || state.lastFrame || defaultFrame());
       out.vFrame.square1x1 = sq;
     }
-    if (idx === ved.index) { out.vSilence = ved.silence ? clone(ved.silence) : null; out.vCaptions = ved.captions ? clone(ved.captions) : null; }
+    if (idx === ved.index) { out.vSilence = ved.silence ? clone(ved.silence) : null; out.vCaptions = ved.captions ? clone(ved.captions) : null; out.vBrolls = cloneBrolls(ved.brolls); out.vStitch = cloneStitch(ved.stitch); }
     out.vBgm = cloneBgm(ved.bgm);
   });
 }
@@ -505,6 +547,8 @@ async function loadVedClip(i) {
   ved.silSens = ved.silence?.sensitivity || "normal";
   ved.bgm = item.vBgm ? { ...item.vBgm } : null;
   ved.captions = item.vCaptions ? clone(item.vCaptions) : null;
+  ved.brolls = cloneBrolls(item.vBrolls);
+  ved.stitch = cloneStitch(item.vStitch);
   if ($("#ved-face-status")) $("#ved-face-status").textContent = "";
   ved.layers = await preloadLayerImages(cloneLayers(item.vLayers));
   ved.sel = ved.layers.length ? 0 : -1;
@@ -1177,4 +1221,70 @@ $("#ved-cap-text")?.addEventListener("input", e => {
     return { word, start: totalStart + idx * step, end: totalStart + (idx + 1) * step };
   });
   drawVEditor();
+});
+
+/* ---- Phase 4: B-Roll Cutaways & Dual-Speaker Stitching ---- */
+$("#ved-broll-add")?.addEventListener("click", () => $("#ved-broll-file")?.click());
+$("#ved-broll-file")?.addEventListener("change", async e => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const bv = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto", src: url });
+  await new Promise(res => { bv.onloadedmetadata = res; bv.onerror = res; setTimeout(res, 2000); });
+  const cur = Number($("#ved-time")?.value) || 0;
+  const dur = Math.min(3, bv.duration || 3);
+  ved.brolls.push({ name: file.name, blob: file, url, video: bv, startTime: Number(cur.toFixed(1)), endTime: Number((cur + dur).toFixed(1)), mode: "full" });
+  vedSyncControls();
+  await vedSeek(cur);
+  drawVEditor();
+  toast("B-Roll added.");
+});
+$("#ved-broll-list")?.addEventListener("click", e => {
+  const del = e.target.closest("[data-bdel]");
+  if (del) {
+    const idx = Number(del.dataset.bdel);
+    const removed = ved.brolls.splice(idx, 1)[0];
+    if (removed?.url) try { URL.revokeObjectURL(removed.url); } catch {}
+    vedSyncControls();
+    drawVEditor();
+    return;
+  }
+  const modeBtn = e.target.closest("[data-bmode]");
+  if (modeBtn) {
+    const b = ved.brolls[Number(modeBtn.dataset.bmode)];
+    if (!b) return;
+    b.mode = b.mode === "top" ? "full" : "top";
+    vedSyncControls();
+    drawVEditor();
+  }
+});
+$("#ved-broll-list")?.addEventListener("input", e => {
+  const bs = e.target.closest("[data-bstart]");
+  if (bs) {
+    const b = ved.brolls[Number(bs.dataset.bstart)];
+    if (b) { b.startTime = Math.max(0, Number(bs.value) || 0); drawVEditor(); }
+    return;
+  }
+  const be = e.target.closest("[data-bend]");
+  if (be) {
+    const b = ved.brolls[Number(be.dataset.bend)];
+    if (b) { b.endTime = Math.max(0, Number(be.value) || 0); drawVEditor(); }
+  }
+});
+$("#ved-stitch-add")?.addEventListener("click", () => $("#ved-stitch-file")?.click());
+$("#ved-stitch-file")?.addEventListener("change", e => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (!file) return;
+  if (ved.stitch?.url) try { URL.revokeObjectURL(ved.stitch.url); } catch {}
+  ved.stitch = { name: file.name, blob: file, url: URL.createObjectURL(file) };
+  vedSyncControls();
+  toast("Second speaker clip stitched after this clip.");
+});
+$("#ved-stitch-del")?.addEventListener("click", () => {
+  if (ved.stitch?.url) try { URL.revokeObjectURL(ved.stitch.url); } catch {}
+  ved.stitch = null;
+  vedSyncControls();
+  toast("Stitched clip removed.");
 });
