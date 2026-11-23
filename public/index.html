@@ -152,7 +152,7 @@
           <div class="ed-seg" id="ed-sel" role="group" aria-label="Box to edit"></div>
         </div>
         <div class="ed-tool-row span-full"><button id="ed-swap" class="btn" type="button">Swap</button><button id="ed-reset" class="btn" type="button">Reset</button></div>
-        <div class="ed-tool-row span-full"><button id="ed-overlays" class="btn" type="button">Vertical Editor</button><button id="ed-animator" class="btn" type="button">Animator</button></div>
+        <div class="ed-tool-row span-full"><button id="ed-overlays" class="btn" type="button">Vertical Editor</button></div>
         <div class="ed-clips-wrap span-full">
           <div class="ed-clips-head"><p class="ed-cap">Clips to convert</p><button id="ed-pick-all" class="btn ed-mini" type="button">All</button></div>
           <div id="ed-clips" class="ed-clips"></div>
@@ -176,6 +176,11 @@
       <div class="ed-play-row"><button id="ved-play" data-pv-play class="btn ed-mini" type="button">▶ Play</button><button data-pv-sound class="btn ed-mini" type="button" aria-label="Preview sound on or off" aria-pressed="true">🔊</button></div>
     </div>
     <div class="ved-tools">
+      <div class="ved-card span-full">
+        <div class="ed-clips-head"><p class="ed-cap">Templates (1-tap)</p><span class="hint" style="margin:0;font-size:10.5px">9:16</span></div>
+        <div id="ved-tpl-grid" class="ved-tpl-grid"></div>
+        <label class="stage-field" style="margin-top:8px"><span>Watermark handle</span><input id="ved-wm-text" type="text" maxlength="40" placeholder="@yourchannel"></label>
+      </div>
       <div class="span-full">
         <p class="ed-cap">Editing mode (text always stays individual)</p>
         <div class="ed-seg" id="ved-scope" role="group" aria-label="Editing scope"><button type="button" data-scope="all" class="on">Applies to all</button><button type="button" data-scope="individual">Individual</button></div>
@@ -185,6 +190,7 @@
         <div class="ed-seg" id="ved-aspect" role="group" aria-label="Frame format"><button type="button" data-aspect="full" class="on">9:16 Full</button><button type="button" data-aspect="square">1:1 Square</button></div>
         <div class="ved-face-row" style="margin-top:8px"><button type="button" class="btn ed-mini" id="ved-face-center">Auto-center face</button><span id="ved-face-status" class="hint" style="margin:0;font-size:11px"></span></div>
         <div id="ved-face-prog" class="ved-prog" hidden><div class="ved-prog-track"><div class="ved-prog-fill" id="ved-face-prog-fill"></div></div><div class="ved-prog-txt"><span id="ved-face-prog-lbl">Downloading face AI...</span><span id="ved-face-prog-pct">0%</span></div></div>
+        <div id="ved-stage-bg-wrap" style="margin-top:8px" hidden><p class="ed-cap">Stage background</p><div id="ved-stage-bg" class="stage-bg-grid"></div></div>
       </div>
       <div class="ved-card span-full">
         <div class="ed-clips-head"><p class="ed-cap">Smart cut (silences)</p><span id="ved-sil-status" class="hint" style="margin:0;font-size:11px">Off</span></div>
@@ -197,12 +203,14 @@
         <div class="ed-tool-row" style="margin-top:8px"><button type="button" class="btn ed-mini" id="ved-cap-gen">Generate captions</button><button type="button" class="btn ed-mini del" id="ved-cap-clear" hidden>Remove</button></div>
         <div id="ved-cap-prog" class="ved-prog" hidden><div class="ved-prog-track"><div class="ved-prog-fill" id="ved-cap-prog-fill"></div></div><div class="ved-prog-txt"><span id="ved-cap-prog-lbl">Downloading AI model...</span><span id="ved-cap-prog-pct">0%</span></div></div>
         <div id="ved-cap-opts" style="margin-top:8px" hidden>
-          <div class="ed-seg" id="ved-cap-style"><button type="button" data-cstyle="highlight" class="on">Highlight</button><button type="button" data-cstyle="word">1 Word</button><button type="button" data-cstyle="clean">Clean</button></div>
+          <div class="ed-seg" id="ved-cap-style"><button type="button" data-cstyle="highlight" class="on">Highlight</button><button type="button" data-cstyle="word">1 Word</button><button type="button" data-cstyle="plain">Plain</button></div>
+          <label class="stage-chk" style="margin-top:6px"><input id="ved-cap-caps" type="checkbox" checked><span>ALL CAPS</span></label>
           <div class="ved-colors" id="ved-cap-colors" style="margin-top:8px"></div>
           <label class="ed-time" style="margin-top:6px">Size (<span id="ved-cap-size-val">40</span>px)<input id="ved-cap-size" type="range" min="24" max="64" step="2" value="40"></label>
           <label class="ed-time" style="margin-top:6px">Position Y (<span id="ved-cap-y-val">72</span>%)<input id="ved-cap-y" type="range" min="15" max="90" step="1" value="72"></label>
           <p class="ed-cap" style="margin-top:8px">Edit transcript (keeps timing)</p>
           <textarea id="ved-cap-text" class="ved-text-input" rows="3" placeholder="Generated words..."></textarea>
+          <p class="hint" style="margin:4px 0 0;font-size:10.5px">Color a word: <code>[g:word]</code> green, <code>[y:word]</code> yellow, <code>[r:word]</code> red</p>
         </div>
       </div>
       <div class="ved-card span-full">
@@ -253,6 +261,21 @@
       <div class="ved-card span-full">
         <div class="ed-clips-head"><p class="ed-cap">Overlays</p><span id="ved-ov-count" class="hint" style="margin:0;font-size:11px">0/5 saved</span></div>
         <div id="ved-ov-list" class="ved-ov-list"></div>
+      </div>
+      <div class="ved-card span-full">
+        <div class="ed-tool-row"><button type="button" class="btn" id="ved-anim-toggle" aria-pressed="false">3D phone animation: Off</button></div>
+        <details id="ved-anim-adv" class="ved-anim-adv">
+          <summary>Advanced</summary>
+          <div class="ved-anim-adv-body">
+            <div><p class="ed-cap">Phone colour</p><div class="ved-colors" id="ved-anim-sw"></div></div>
+            <div><p class="ed-cap">Table surface</p><div class="ed-seg" id="ved-anim-surf"><button type="button" data-surf="wood" class="on">Wood</button><button type="button" data-surf="marble">Marble</button><button type="button" data-surf="concrete">Concrete</button></div></div>
+            <label class="stage-chk"><input id="ved-anim-stk-on" type="checkbox" checked><span>Show top sticker</span></label>
+            <div><p class="ed-cap">Sticker style</p><div class="ed-seg" id="ved-anim-stk-presets"></div></div>
+            <label class="stage-field"><span>Sticker text</span><input id="ved-anim-stk-txt" type="text" maxlength="48" value="Follow for more clips"></label>
+            <div><p class="ed-cap">Apply scope</p><div class="ed-seg" id="ved-anim-scope"><button type="button" data-ascope="all" class="on">Applies to all</button><button type="button" data-ascope="individual">Individual</button></div></div>
+            <div class="ed-tool-row"><button type="button" class="btn ed-mini" id="ved-anim-preview">Preview 3D animation</button></div>
+          </div>
+        </details>
       </div>
       <div class="ved-card span-full">
         <div class="ed-clips-head"><p class="ed-cap">Offline AI packs (1-time)</p><span id="ved-ai-status" class="hint" style="margin:0;font-size:11px">Checking...</span></div>
@@ -325,6 +348,7 @@
 <script defer src="/js/presets.js"></script>
 <script defer src="/js/editor.js"></script>
 <script defer src="/js/veditor.js"></script>
+<script defer src="/js/vtemplates.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script defer src="/js/animator.js"></script>
 <script defer src="/js/preview.js"></script>
