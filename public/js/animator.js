@@ -24,7 +24,6 @@ const anim = {
   index: 0,
   frame: null,
   returnToEditor: false,
-  returnToVEditor: false,
   scope: "all",
   cfg: typeof defaultAnimPrefs === "function" ? defaultAnimPrefs() : { enabled: false, scope: "all", color: 0xc5d5e4, ti: false, surface: "wood", sticker: true, stickerPreset: "follow", stickerText: "Follow for more clips" },
   playing: true,
@@ -232,6 +231,7 @@ function getAnimEngine() {
   }
   phone.position.set(0, FZ, 0); phone.rotation.set(-Math.PI / 2, 0, 0);
   scene.add(phone);
+
 
   const gcv = document.createElement("canvas"); gcv.width = gcv.height = 256;
   { const g = gcv.getContext("2d"), r = g.createRadialGradient(128, 128, 10, 128, 128, 128); r.addColorStop(0, "rgba(255,255,255,.9)"); r.addColorStop(0.4, "rgba(255,255,255,.3)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 256, 256); }
@@ -602,7 +602,6 @@ async function openAnimator(i, opts = {}) {
     anim.scope = savedPrefs.scope === "individual" ? "individual" : "all";
     anim.frame = clone(opts.frame || item.vFrame || state.lastFrame || defaultFrame());
     anim.returnToEditor = !!opts.returnToEditor;
-    anim.returnToVEditor = !!opts.returnToVEditor;
     const cv = $("#anim-canvas");
     cv.width = 540; cv.height = 960;
     $("#anim-stage").style.maxWidth = "calc(44dvh * 0.5625)";
@@ -626,13 +625,10 @@ function closeAnimator(reopenFraming = false) {
   if (anim.video) { try { anim.video.pause(); anim.video.removeAttribute("src"); } catch {} anim.video = null; }
   $("#animator").hidden = true;
   document.body.style.overflow = "";
-  const backEd = reopenFraming && anim.returnToEditor;
-  const backVed = reopenFraming && anim.returnToVEditor;
+  const back = reopenFraming && anim.returnToEditor;
   const idx = anim.index;
   anim.returnToEditor = false;
-  anim.returnToVEditor = false;
-  if (backVed && typeof openVerticalEditor === "function") openVerticalEditor(idx, { frame: anim.frame });
-  else if (backEd) openEditor(idx);
+  if (back) openEditor(idx);
 }
 
 /* ---- Event Listeners ---- */
