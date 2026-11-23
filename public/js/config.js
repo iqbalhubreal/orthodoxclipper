@@ -41,6 +41,7 @@ function defaultClipperPrefs() {
   return {
     maxlen: "3",
     mode: "fast",
+    watermark: "@yourchannel",
     frame: null,
     ved: {
       scope: "all",
@@ -56,6 +57,7 @@ function loadClipperPrefs() {
     if (!raw || typeof raw !== "object") return base;
     if (["1", "2", "3"].includes(String(raw.maxlen))) base.maxlen = String(raw.maxlen);
     if (raw.mode === "fast" || raw.mode === "accurate") base.mode = raw.mode;
+    if (typeof raw.watermark === "string" && raw.watermark.trim()) base.watermark = raw.watermark.trim().slice(0, 40);
     if (raw.frame && typeof raw.frame === "object") base.frame = raw.frame;
     if (raw.ved && typeof raw.ved === "object") {
       base.ved.scope = raw.ved.scope === "individual" ? "individual" : "all";
