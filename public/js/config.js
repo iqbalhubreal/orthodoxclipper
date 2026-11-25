@@ -37,15 +37,6 @@ function defaultAnimPrefs() {
   };
 }
 
-function defaultCompressPrefs() {
-  return {
-    enabled: false,
-    targetHeight: 720,
-    videoBitrate: 2000000,
-    useHevc: true,
-  };
-}
-
 function defaultClipperPrefs() {
   return {
     maxlen: "3",
@@ -55,10 +46,6 @@ function defaultClipperPrefs() {
       scope: "all",
     },
     anim: defaultAnimPrefs(),
-    compress: defaultCompressPrefs(),
-    importCompress: defaultCompressPrefs(),
-    cutCompress: defaultCompressPrefs(),
-    deviceCompress: defaultCompressPrefs(),
   };
 }
 
@@ -83,15 +70,6 @@ function loadClipperPrefs() {
       if (["follow", "subscribe", "custom"].includes(raw.anim.stickerPreset)) base.anim.stickerPreset = raw.anim.stickerPreset;
       if (typeof raw.anim.stickerText === "string") base.anim.stickerText = raw.anim.stickerText.slice(0, 48);
     }
-    for (const k of ["compress", "importCompress", "cutCompress", "deviceCompress"]) {
-      const r = raw[k];
-      if (r && typeof r === "object") {
-        base[k].enabled = !!r.enabled;
-        if ([480, 720, 1080].includes(Number(r.targetHeight))) base[k].targetHeight = Number(r.targetHeight);
-        if ([1000000, 2000000, 4000000].includes(Number(r.videoBitrate))) base[k].videoBitrate = Number(r.videoBitrate);
-        base[k].useHevc = r.useHevc !== false;
-      }
-    }
   } catch {}
   return base;
 }
@@ -104,10 +82,6 @@ function saveClipperPrefs(patch) {
       ...patch,
       ved: { ...cur.ved, ...(patch?.ved || {}) },
       anim: { ...cur.anim, ...(patch?.anim || {}) },
-      compress: { ...cur.compress, ...(patch?.compress || {}) },
-      importCompress: { ...cur.importCompress, ...(patch?.importCompress || {}) },
-      cutCompress: { ...cur.cutCompress, ...(patch?.cutCompress || {}) },
-      deviceCompress: { ...cur.deviceCompress, ...(patch?.deviceCompress || {}) },
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(next));
   } catch {}

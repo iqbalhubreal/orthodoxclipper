@@ -20,36 +20,7 @@ async function cutWithAndroidNative(cutStart, cutEnd, outputName) {
   if (!res.ok) throw new Error("Could not read native clip");
   return await res.blob();
 }
-function syncCutCompressUI() {
-  const c = (typeof loadClipperPrefs === "function" ? loadClipperPrefs().cutCompress : null) || { enabled: false, targetHeight: 720, videoBitrate: 2000000, useHevc: true };
-  if ($("#cut-compress-on")) $("#cut-compress-on").checked = !!c.enabled;
-  if ($("#cut-compress-height")) $("#cut-compress-height").value = String(c.targetHeight || 720);
-  if ($("#cut-compress-bitrate")) $("#cut-compress-bitrate").value = String(c.videoBitrate || 2000000);
-  if ($("#cut-compress-hevc")) $("#cut-compress-hevc").checked = c.useHevc !== false;
-  const optsEl = $("#cut-compress-opts"), sumEl = $("#cut-compress-summary");
-  if (optsEl) { optsEl.hidden = !c.enabled; optsEl.style.display = c.enabled ? "grid" : "none"; }
-  if (sumEl) {
-    sumEl.textContent = c.enabled
-      ? `${c.targetHeight || 720}p · ${Math.round((c.videoBitrate || 2000000) / 1000000)} Mbps · ${c.useHevc !== false ? "H.265" : "H.264"}`
-      : "Off";
-  }
-}
-function saveCutCompressUI() {
-  const patch = {
-    enabled: !!$("#cut-compress-on")?.checked,
-    targetHeight: Number($("#cut-compress-height")?.value) || 720,
-    videoBitrate: Number($("#cut-compress-bitrate")?.value) || 2000000,
-    useHevc: $("#cut-compress-hevc")?.checked !== false,
-  };
-  if (typeof saveClipperPrefs === "function") saveClipperPrefs({ cutCompress: patch });
-  syncCutCompressUI();
-}
-["#cut-compress-on", "#cut-compress-height", "#cut-compress-bitrate", "#cut-compress-hevc"].forEach(sel => {
-  $(sel)?.addEventListener("change", saveCutCompressUI);
-});
-syncCutCompressUI();
-
-async function cutWithWebCodecs(cutStart, cutEnd, onProgress, compressCfg = null) {
+async function cutWithWebCodecs(cutStart, cutEnd, onProgress) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
@@ -58,26 +29,11 @@ async function cutWithWebCodecs(cutStart, cutEnd, onProgress, compressCfg = null
   try {
     const trim = { start: cutStart };
     if (Number.isFinite(cutEnd)) trim.end = cutEnd;
-    let videoOpts = { codec: "avc" };
-    if (compressCfg?.enabled) {
-      const th = [480, 720, 1080].includes(Number(compressCfg.targetHeight)) ? Number(compressCfg.targetHeight) : 720;
-      const br = [1_000_000, 2_000_000, 4_000_000].includes(Number(compressCfg.videoBitrate)) ? Number(compressCfg.videoBitrate) : 2_000_000;
-      videoOpts = { codec: compressCfg.useHevc !== false ? "hevc" : "avc", bitrate: br, hardwareAcceleration: "prefer-hardware" };
-      const trk = await input.getPrimaryVideoTrack();
-      const sw = trk?.displayWidth || 0, sh = trk?.displayHeight || 0;
-      if (sw > 0 && sh > 0 && sh > th) {
-        const even = n => Math.max(2, Math.round(n / 2) * 2);
-        videoOpts.height = even(th);
-        videoOpts.width = even(sw * (th / sh));
-      } else if (!sh) {
-        videoOpts.height = th;
-      }
-    }
     const conversion = await Conversion.init({
       input,
       output,
       trim,
-      video: videoOpts,
+      video: { codec: "avc" },
       audio: { codec: "aac" },
     });
     if (!conversion.isValid) return null;
@@ -87,10 +43,6 @@ async function cutWithWebCodecs(cutStart, cutEnd, onProgress, compressCfg = null
     return new Blob([output.target.buffer], { type: "video/mp4" });
   } catch (error) {
     if (state.cancelled) throw error;
-    if (compressCfg?.enabled && compressCfg.useHevc !== false) {
-      try { input.dispose?.(); } catch {}
-      return await cutWithWebCodecs(cutStart, cutEnd, onProgress, { ...compressCfg, useHevc: false });
-    }
     console.warn("WebCodecs cut unavailable, falling back to FFmpeg:", error);
     return null;
   } finally {
@@ -120,42 +72,27 @@ async function makeClips(highlights, clips) {
     const cutStart = Math.max(0, h.start - PAD);
     const cutEnd = Math.min(state.duration || Infinity, h.end + PAD);
     const output = `orthodox_clip_${String(i + 1).padStart(2,"0")}.mp4`;
-    const cutCompressCfg = (typeof loadClipperPrefs === "function" ? loadClipperPrefs().cutCompress : null) || { enabled: false };
     let blob = null;
-    let compressedAlready = false;
-    if (IS_ANDROID_APP || cutCompressCfg.enabled) {
-      if (fast && IS_ANDROID_APP && !cutCompressCfg.enabled) {
-        blob = await Promise.race([cutWithAndroidNative(cutStart, cutEnd, output), state.cancelPromise]);
-      } else if (!fast || cutCompressCfg.enabled) {
-        blob = await Promise.race([cutWithWebCodecs(cutStart, cutEnd, p => setBar((i + p) / highlights.length), cutCompressCfg), state.cancelPromise]);
-        if (blob && cutCompressCfg.enabled) compressedAlready = true;
-      }
+    if (IS_ANDROID_APP) {
+      blob = fast
+        ? await Promise.race([cutWithAndroidNative(cutStart, cutEnd, output), state.cancelPromise])
+        : await Promise.race([cutWithWebCodecs(cutStart, cutEnd, p => setBar((i + p) / highlights.length)), state.cancelPromise]);
       if (blob) showBusy(true, state.progressMessage);
     }
     if (!blob) {
       await ensureFFmpegInput();
       showBusy(true, state.progressMessage);
       const args = ["-ss", cutStart.toFixed(3), "-i", input, "-t", (cutEnd - cutStart).toFixed(3)];
-      if (fast && !cutCompressCfg.enabled) {
-        args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
-      } else if (cutCompressCfg.enabled) {
-        const th = [480, 720, 1080].includes(Number(cutCompressCfg.targetHeight)) ? Number(cutCompressCfg.targetHeight) : 720;
-        const br = [1_000_000, 2_000_000, 4_000_000].includes(Number(cutCompressCfg.videoBitrate)) ? Number(cutCompressCfg.videoBitrate) : 2_000_000;
-        const brK = `${Math.max(400, Math.round(br / 1000))}k`;
-        args.push("-vf", `scale=-2:'min(ih,${th})'`, "-c:v", "libx264", "-preset", "veryfast", "-b:v", brK, "-maxrate", brK, "-bufsize", `${Math.round(br / 500)}k`, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
-        compressedAlready = true;
-      } else {
+      if (fast) args.push("-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", output);
+      else {
         args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output);
       }
-      const code = await Promise.race([ff.exec(args, fast && !cutCompressCfg.enabled ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
-      if (code === 1 && fast && !cutCompressCfg.enabled) throw new Error(`Cutting clip ${i + 1} timed out. This phone may be too slow or low on memory for this video. Try a shorter or smaller H.264 MP4.`);
+      const code = await Promise.race([ff.exec(args, fast ? FAST_CUT_TIMEOUT_MS : -1), state.cancelPromise]);
+      if (code === 1 && fast) throw new Error(`Cutting clip ${i + 1} timed out. This phone may be too slow or low on memory for this video. Try a shorter or smaller H.264 MP4.`);
       if (code !== 0) throw new Error(`Could not cut clip ${i + 1}. Try an MP4 video encoded with H.264.`);
       const bytes = await ff.readFile(output);
       try { await ff.deleteFile(output); } catch {}
       blob = new Blob([bytes], { type: "video/mp4" });
-    }
-    if (cutCompressCfg.enabled && !compressedAlready && typeof compressVideoBlob === "function") {
-      blob = await compressVideoBlob(blob, cutCompressCfg, p => setBar((i + p) / highlights.length));
     }
     const cutSeconds = (performance.now() - began) / 1000;
     state.laps.push(`Clip ${i + 1} cut in ${cutSeconds.toFixed(1)} s`);
