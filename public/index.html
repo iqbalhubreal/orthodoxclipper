@@ -57,14 +57,6 @@
     <span id="file-meta">MP4, MOV, WebM</span>
   </label>
   <div id="warn" class="warn" role="note" hidden></div>
-  <div class="stage-card" id="import-compress-card" style="margin-top:10px">
-    <div class="ed-clips-head" style="margin:0"><label class="stage-chk"><input id="import-compress-on" type="checkbox"><span>Compress video on import</span></label><span id="import-compress-summary" class="hint" style="margin:0;font-size:11px">Off</span></div>
-    <div id="import-compress-opts" hidden style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <label class="stage-field"><span>Resolution</span><select id="import-compress-height"><option value="480">480p (Fastest)</option><option value="720" selected>720p (Balanced)</option><option value="1080">1080p (Full HD)</option></select></label>
-      <label class="stage-field"><span>Bitrate</span><select id="import-compress-bitrate"><option value="1000000">1 Mbps (Small)</option><option value="2000000" selected>2 Mbps (Balanced)</option><option value="4000000">4 Mbps (High)</option></select></label>
-      <label class="stage-chk" style="grid-column:1 / -1"><input id="import-compress-hevc" type="checkbox" checked><span>HEVC (H.265, smaller file; falls back to H.264)</span></label>
-    </div>
-  </div>
   </div>
   </details>
 
@@ -86,18 +78,9 @@
     </div>
     <input type="hidden" id="mode" value="fast">
     <p class="hint" id="mode-hint"></p>
-    <div class="stage-card" id="cut-compress-card" style="margin-top:10px">
-      <div class="ed-clips-head" style="margin:0"><label class="stage-chk"><input id="cut-compress-on" type="checkbox"><span>Compress cut clips</span></label><span id="cut-compress-summary" class="hint" style="margin:0;font-size:11px">Off</span></div>
-      <div id="cut-compress-opts" hidden style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <label class="stage-field"><span>Resolution</span><select id="cut-compress-height"><option value="480">480p (Fastest)</option><option value="720" selected>720p (Balanced)</option><option value="1080">1080p (Full HD)</option></select></label>
-        <label class="stage-field"><span>Bitrate</span><select id="cut-compress-bitrate"><option value="1000000">1 Mbps (Small)</option><option value="2000000" selected>2 Mbps (Balanced)</option><option value="4000000">4 Mbps (High)</option></select></label>
-        <label class="stage-chk" style="grid-column:1 / -1"><input id="cut-compress-hevc" type="checkbox" checked><span>HEVC (H.265, smaller file; falls back to H.264)</span></label>
-      </div>
-    </div>
   </div>
   <button id="go" type="button">Create clips &amp; captions</button>
   <button id="open-vmaker" class="btn" type="button" style="width:100%;margin-top:8px">Vertical Maker (import video)</button>
-  <button id="open-compressor" class="btn" type="button" style="width:100%;margin-top:8px">Compress video (from device)</button>
   <input id="vmaker-files" type="file" accept="video/*" multiple hidden>
   <p id="privacy">Your video stays on your device.</p>
   <div id="app-note" style="margin-top:14px;text-align:center">
@@ -170,14 +153,6 @@
         </div>
         <div class="ed-tool-row span-full"><button id="ed-swap" class="btn" type="button">Swap</button><button id="ed-reset" class="btn" type="button">Reset</button></div>
         <div class="ed-tool-row span-full"><button id="ed-overlays" class="btn" type="button">Vertical Editor</button><button id="ed-animator" class="btn" type="button">Animator</button></div>
-        <div class="stage-card span-full" id="ed-compress-card">
-          <div class="ed-clips-head" style="margin:0"><label class="stage-chk"><input id="ed-compress-on" type="checkbox"><span>Compress output video</span></label><span id="ed-compress-summary" class="hint" style="margin:0;font-size:11px">Off (1080p · 5 Mbps)</span></div>
-          <div id="ed-compress-opts" hidden style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <label class="stage-field"><span>Resolution</span><select id="ed-compress-height"><option value="480">480p (Fastest)</option><option value="720" selected>720p (Balanced)</option><option value="1080">1080p (Full HD)</option></select></label>
-            <label class="stage-field"><span>Bitrate</span><select id="ed-compress-bitrate"><option value="1000000">1 Mbps (Small)</option><option value="2000000" selected>2 Mbps (Balanced)</option><option value="4000000">4 Mbps (High)</option></select></label>
-            <label class="stage-chk" style="grid-column:1 / -1"><input id="ed-compress-hevc" type="checkbox" checked><span>HEVC (H.265, smaller file; falls back to H.264)</span></label>
-          </div>
-        </div>
         <div class="ed-clips-wrap span-full">
           <div class="ed-clips-head"><p class="ed-cap">Clips to convert</p><button id="ed-pick-all" class="btn ed-mini" type="button">All</button></div>
           <div id="ed-clips" class="ed-clips"></div>
@@ -329,18 +304,6 @@
   </div>
   <div class="ed-foot"><button id="anim-back" class="btn" type="button">Move Back</button><button id="anim-save" class="btn primary" type="button">Save</button></div>
 </div></div>
-<div id="compressor-modal" role="dialog" aria-modal="true" aria-labelledby="cmp-title" hidden><div class="h-box">
-  <div class="h-top"><h3 id="cmp-title">Video Compressor</h3><button id="cmp-close" class="btn" type="button">Close</button></div>
-  <p class="hint">Compress any video from your device locally before sharing or editing.</p>
-  <div class="stage-card" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    <label class="stage-field"><span>Resolution</span><select id="cmp-height"><option value="480">480p (Fastest)</option><option value="720" selected>720p (Balanced)</option><option value="1080">1080p (Full HD)</option></select></label>
-    <label class="stage-field"><span>Bitrate</span><select id="cmp-bitrate"><option value="1000000">1 Mbps (Small)</option><option value="2000000" selected>2 Mbps (Balanced)</option><option value="4000000">4 Mbps (High)</option></select></label>
-    <label class="stage-chk" style="grid-column:1 / -1"><input id="cmp-hevc" type="checkbox" checked><span>HEVC (H.265, smaller file; falls back to H.264)</span></label>
-  </div>
-  <div class="clip-actions" style="margin-top:12px"><button id="cmp-pick" class="btn primary" type="button">Choose video(s) to compress</button><input id="cmp-file" type="file" accept="video/*" multiple hidden></div>
-  <div id="cmp-prog" class="ved-prog" hidden style="margin-top:10px"><div class="ved-prog-track"><div class="ved-prog-fill" id="cmp-prog-fill"></div></div><div class="ved-prog-txt"><span id="cmp-prog-lbl">Compressing...</span><span id="cmp-prog-pct">0%</span></div></div>
-  <div id="cmp-results" style="margin-top:10px"></div>
-</div></div>
 <div id="history" role="dialog" aria-modal="true" aria-labelledby="h-title" hidden><div class="h-box">
   <div class="h-top"><h3 id="h-title">History</h3><div class="clip-actions" style="margin:0"><button id="h-clear" class="btn del" type="button">Delete all</button><button id="h-close" class="btn" type="button">Close</button></div></div>
   <p class="hint" id="h-notice">Saved in this browser (videos are not stored).</p>
@@ -355,7 +318,6 @@
 <script defer src="/js/ai.js"></script>
 <script defer src="/js/engine.js"></script>
 <script defer src="/js/results.js"></script>
-<script defer src="/js/compressor.js"></script>
 <script defer src="/js/cutting.js"></script>
 <script defer src="/js/upload.js"></script>
 <script defer src="/js/stage.js"></script>

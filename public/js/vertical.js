@@ -93,8 +93,8 @@ function defaultFrame(count = 2) {
   }
   return { fit: false, layout: getLayoutPresets(count)[0].id, boxes: Array.from({ length: count }, (_, idx) => defaultBoxAt(idx, count)), stage };
 }
-function verticalFilter(f, W = 1080, TOTAL_H = 1920) {
-  const boxes = getFrameBoxes(f), slots = getFrameSlots(f);
+function verticalFilter(f) {
+  const boxes = getFrameBoxes(f), slots = getFrameSlots(f), W = 1080, TOTAL_H = 1920;
   const even = n => Math.max(2, Math.round(n / 2) * 2);
   const parts = boxes.map((r, idx) => {
     const slot = slots[idx], sw = even(slot.w * W), sh = even(slot.h * TOTAL_H), tag = `b${idx}`;
@@ -212,21 +212,9 @@ async function buildMixedAudioBuffer(item, silenceCfg, bgmCfg, targetDur) {
   }
 }
 
-function getVerticalCompressConfig() {
-  const raw = (typeof loadClipperPrefs === "function" ? loadClipperPrefs().compress : null) || {};
-  const enabled = !!raw.enabled;
-  const targetHeight = [480, 720, 1080].includes(Number(raw.targetHeight)) ? Number(raw.targetHeight) : 720;
-  const videoBitrate = [1000000, 2000000, 4000000].includes(Number(raw.videoBitrate)) ? Number(raw.videoBitrate) : 2000000;
-  const useHevc = raw.useHevc !== false;
-  if (!enabled) return { enabled: false, W: 1080, TOTAL_H: 1920, targetHeight: 1080, bitrate: 5_000_000, codec: "avc", useHevc: false };
-  const W = targetHeight === 480 ? 480 : targetHeight === 720 ? 720 : 1080;
-  const TOTAL_H = targetHeight === 480 ? 854 : targetHeight === 720 ? 1280 : 1920;
-  return { enabled: true, W, TOTAL_H, targetHeight, bitrate: videoBitrate, codec: useHevc ? "hevc" : "avc", useHevc };
-}
-
-async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg, compressCfg = getVerticalCompressConfig()) {
+async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg) {
   const { Input, Output, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget, VideoSampleSink, CanvasSource, AudioBufferSource } = mb;
-  const W = compressCfg.W, TOTAL_H = compressCfg.TOTAL_H, FPS = 30;
+  const W = 1080, TOTAL_H = 1920, FPS = 30;
   const frameBoxes = getFrameBoxes(frame), slots = getFrameSlots(frame);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
   const stageEnabled = !!(frame.stage?.enabled && typeof drawStageComposition === "function");
@@ -250,7 +238,7 @@ async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg
     const animSrcCtx = animSrcCv ? animSrcCv.getContext("2d", { alpha: false }) : null;
 
     const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-    const videoSource = new CanvasSource(outCanvas, { codec: compressCfg.codec || "avc", bitrate: compressCfg.bitrate || 5_000_000, hardwareAcceleration: "prefer-hardware" });
+    const videoSource = new CanvasSource(outCanvas, { codec: "avc", bitrate: 5_000_000, hardwareAcceleration: "prefer-hardware" });
     output.addVideoTrack(videoSource, { frameRate: FPS });
     let audioSource = null;
     if (mixedAudio) {
@@ -394,28 +382,19 @@ async function makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg
   }
 }
 
-async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, animCfg = null, compressCfg = getVerticalCompressConfig()) {
+async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, animCfg = null) {
   const mb = await getMediabunny();
   if (!mb || state.cancelled) return null;
   if ((item.vSilence?.enabled && item.vSilence.segments?.length) || item.vBgm?.blob || (item.vBrolls && item.vBrolls.length) || item.vStitch?.blob) {
     try {
-      return await makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg, compressCfg);
+      return await makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg);
     } catch (err) {
       if (state.cancelled) throw err;
-      if (compressCfg.codec === "hevc") {
-        try {
-          return await makeVerticalCustomAV(mb, item, frame, onProgress, preEnv, animCfg, { ...compressCfg, codec: "avc" });
-        } catch (err2) {
-          if (state.cancelled) throw err2;
-          console.warn("Custom AV pipeline failed, falling back:", err2);
-        }
-      } else {
-        console.warn("Custom AV pipeline failed, falling back:", err);
-      }
+      console.warn("Custom AV pipeline failed, falling back:", err);
     }
   }
   const { Input, Output, Conversion, ALL_FORMATS, BlobSource, Mp4OutputFormat, BufferTarget } = mb;
-  const W = compressCfg.W, TOTAL_H = compressCfg.TOTAL_H, FPS = 30;
+  const W = 1080, TOTAL_H = 1920, FPS = 30;
   const frameBoxes = getFrameBoxes(frame);
   const slots = getFrameSlots(frame);
   const layers = item.vLayers?.length ? await preloadLayerImages(item.vLayers) : [];
@@ -436,8 +415,8 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
       input,
       output,
       video: {
-        codec: compressCfg.codec || "avc",
-        bitrate: compressCfg.bitrate || 5_000_000,
+        codec: "avc",
+        bitrate: 5_000_000,
         hardwareAcceleration: "prefer-hardware",
         processedWidth: W,
         processedHeight: TOTAL_H,
@@ -519,10 +498,6 @@ async function makeVerticalWebCodecs(item, frame, onProgress, preEnv = null, ani
     return new Blob([output.target.buffer], { type: "video/mp4" });
   } catch (error) {
     if (state.cancelled) throw error;
-    if (compressCfg.codec === "hevc") {
-      try { input.dispose?.(); } catch {}
-      return await makeVerticalWebCodecs(item, frame, onProgress, preEnv, animCfg, { ...compressCfg, codec: "avc" });
-    }
     console.warn("WebCodecs vertical unavailable, falling back to FFmpeg:", error);
     return null;
   } finally {
@@ -536,33 +511,23 @@ async function makeVertical(ff, i, frame, onProgress) {
   item.vFrame = clone(clipFrame);
   const _allPrefs = typeof loadClipperPrefs === "function" ? loadClipperPrefs() : { anim: { enabled: false } };
   const animCfg = clone(item.vAnim || _allPrefs.anim || { enabled: false });
-  const compressCfg = getVerticalCompressConfig();
-  const useWebCodecs = IS_ANDROID_APP || compressCfg.enabled || !!clipFrame.stage?.enabled || !!animCfg.enabled || !!clipFrame.square1x1 || !!(item.vLayers && item.vLayers.length) || !!item.vSilence?.enabled || !!item.vBgm?.blob || !!item.vCaptions?.enabled || !!(item.vBrolls && item.vBrolls.length) || !!item.vStitch?.blob;
+  const useWebCodecs = IS_ANDROID_APP || !!clipFrame.stage?.enabled || !!animCfg.enabled || !!clipFrame.square1x1 || !!(item.vLayers && item.vLayers.length) || !!item.vSilence?.enabled || !!item.vBgm?.blob || !!item.vCaptions?.enabled || !!(item.vBrolls && item.vBrolls.length) || !!item.vStitch?.blob;
   let vBlob = useWebCodecs
-    ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress, null, animCfg, compressCfg), state.cancelPromise])
+    ? await Promise.race([makeVerticalWebCodecs(item, clipFrame, onProgress, null, animCfg), state.cancelPromise])
     : null;
   if (!vBlob) {
     const engine = ff || await Promise.race([getFFmpeg(), state.cancelPromise]);
     showBusy(true, state.progressMessage);
     const tmpIn = `vin_${i}.mp4`, tmpOut = `vout_${i}.mp4`;
     await engine.writeFile(tmpIn, new Uint8Array(await item.blob.arrayBuffer()));
-    const fc = verticalFilter(clipFrame, compressCfg.W, compressCfg.TOTAL_H);
+    const fc = verticalFilter(clipFrame);
     const args = ["-i", tmpIn, "-filter_complex", fc, "-map", "[v]", "-map", "0:a?"];
-    if (compressCfg.enabled) {
-      const brK = `${Math.max(400, Math.round(compressCfg.bitrate / 1000))}k`;
-      args.push("-c:v", "libx264", "-preset", "veryfast", "-b:v", brK, "-maxrate", brK, "-bufsize", `${Math.round(compressCfg.bitrate / 500)}k`, "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut);
-    } else {
-      args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut);
-    }
+    args.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmpOut);
     const code = await Promise.race([engine.exec(args), state.cancelPromise]);
     if (code !== 0) throw new Error(`Could not make clip ${i + 1} vertical.`);
     const bytes = await engine.readFile(tmpOut);
     try { await engine.deleteFile(tmpIn); await engine.deleteFile(tmpOut); } catch {}
     vBlob = new Blob([bytes], { type: "video/mp4" });
-  }
-  if (compressCfg.enabled && window.AndroidClipper?.compressVideo) {
-    const nativeBlob = await Promise.race([compressWithAndroidNative(vBlob, compressCfg, onProgress), state.cancelPromise]);
-    if (nativeBlob) vBlob = nativeBlob;
   }
   if (item.vUrl) URL.revokeObjectURL(item.vUrl);
   item.vBlob = vBlob;

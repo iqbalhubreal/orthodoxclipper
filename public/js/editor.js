@@ -178,7 +178,7 @@ async function openEditor(i) {
     cv.width = Math.min(960, state.vw); cv.height = Math.round(cv.width * state.vh / state.vw);
     ed.scale = cv.width / state.vw;
     edRenderStageControls();
-    edFitStage(); edSyncUI(); edSyncCompressUI();
+    edFitStage(); edSyncUI();
     $("#ed-clips").innerHTML = "";
     edRenderClips(i);
     $("#editor").hidden = false;
@@ -380,35 +380,6 @@ $("#ed-overlays").addEventListener("click", () => {
   document.body.style.overflow = "";
   openVerticalEditor(idx, { frame, returnToEditor: true });
 });
-function edSyncCompressUI() {
-  const c = (typeof loadClipperPrefs === "function" ? loadClipperPrefs().compress : null) || { enabled: false, targetHeight: 720, videoBitrate: 2000000, useHevc: true };
-  const onEl = $("#ed-compress-on"), optsEl = $("#ed-compress-opts"), sumEl = $("#ed-compress-summary");
-  const hEl = $("#ed-compress-height"), bEl = $("#ed-compress-bitrate"), hevcEl = $("#ed-compress-hevc");
-  if (onEl) onEl.checked = !!c.enabled;
-  if (hEl) hEl.value = String(c.targetHeight || 720);
-  if (bEl) bEl.value = String(c.videoBitrate || 2000000);
-  if (hevcEl) hevcEl.checked = c.useHevc !== false;
-  if (optsEl) { optsEl.hidden = !c.enabled; optsEl.style.display = c.enabled ? "grid" : "none"; }
-  if (sumEl) {
-    sumEl.textContent = c.enabled
-      ? `${c.targetHeight || 720}p · ${Math.round((c.videoBitrate || 2000000) / 1000000)} Mbps · ${c.useHevc !== false ? "H.265" : "H.264"}`
-      : "Off (1080p · 5 Mbps)";
-  }
-}
-function edSaveCompressUI() {
-  const patch = {
-    enabled: !!$("#ed-compress-on")?.checked,
-    targetHeight: Number($("#ed-compress-height")?.value) || 720,
-    videoBitrate: Number($("#ed-compress-bitrate")?.value) || 2000000,
-    useHevc: $("#ed-compress-hevc")?.checked !== false,
-  };
-  if (typeof saveClipperPrefs === "function") saveClipperPrefs({ compress: patch });
-  edSyncCompressUI();
-}
-["#ed-compress-on", "#ed-compress-height", "#ed-compress-bitrate", "#ed-compress-hevc"].forEach(sel => {
-  $(sel)?.addEventListener("change", edSaveCompressUI);
-});
-edSyncCompressUI();
 $("#ed-animator").addEventListener("click", () => {
   previewStop();
   const frame = clone(ed.frame), idx = ed.index;
